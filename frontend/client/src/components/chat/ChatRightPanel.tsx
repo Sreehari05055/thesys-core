@@ -11,51 +11,6 @@ type ChatRightPanelProps = {
   intelPanelRef: RefObject<ImperativePanelHandle | null>;
 };
 
-function SourceHighlightModeToggle({
-  precise,
-  onChange,
-}: {
-  precise: boolean;
-  onChange: (precise: boolean) => void;
-}) {
-  return (
-    <div
-      className="flex h-7 shrink-0 items-center rounded-md border border-border bg-muted p-0.5"
-      role="group"
-      aria-label="Highlight mode"
-    >
-      <button
-        type="button"
-        title="Full retrieved chunk"
-        onClick={() => onChange(false)}
-        className={cn(
-          "rounded px-2 py-1 text-[10px] font-medium transition-colors",
-          !precise
-            ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-        aria-pressed={!precise}
-      >
-        Full
-      </button>
-      <button
-        type="button"
-        title="Focused citation"
-        onClick={() => onChange(true)}
-        className={cn(
-          "rounded px-2 py-1 text-[10px] font-medium transition-colors",
-          precise
-            ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-        aria-pressed={precise}
-      >
-        Focused
-      </button>
-    </div>
-  );
-}
-
 export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
   const {
     showRightPanel,
@@ -85,8 +40,6 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
     addExternalPaperToLibrary,
     panelSources,
     globalSourceNumberById,
-    usePreciseSourceHighlight,
-    setUsePreciseSourceHighlight,
   } = model;
 
   const panelHidden = !showRightPanel;
@@ -94,9 +47,6 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
   const showExternalPaper = activeExternalPaper != null && !viewingSummary;
   const sidebarSources = viewingSummary ? (documentSummary?.sources ?? []) : panelSources;
   const pdfPreview = showPDF && activeSource != null && !showExternalPaper;
-  const activePreviewBboxes = usePreciseSourceHighlight
-    ? activeSource?.precise_bboxes
-    : activeSource?.bboxes;
 
   return (
     <>
@@ -271,10 +221,6 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <SourceHighlightModeToggle
-                          precise={usePreciseSourceHighlight}
-                          onChange={setUsePreciseSourceHighlight}
-                        />
                         <button
                           type="button"
                           onClick={() => {
@@ -320,11 +266,11 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
                     </div>
                     <div className="min-h-0 flex-1">
                     <PDFViewer
-                      key={`${activeSource.id}-${usePreciseSourceHighlight ? "focused" : "full"}`}
+                      key={activeSource.id}
                       sessionId={activeChat?.sessionId ?? ""}
                       docId={getDocId(activeSource)}
                       pages={activeSource.pages || []}
-                      bboxes={activePreviewBboxes}
+                      bboxes={activeSource.bboxes}
                     />
                     </div>
                   </div>
