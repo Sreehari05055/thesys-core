@@ -155,6 +155,14 @@ class ChunkingService:
                     }
                 )
 
+        def _add_text_geometry(element, fallback_page, fallback_bbox, fallback_dims, tag) -> None:
+            boxes = element.get("page_bboxes") or [{"page": fallback_page, "box": fallback_bbox}]
+            for entry in boxes:
+                p = entry.get("page", fallback_page)
+                dims = pdf_page_data.get(p, {}).get("page_dimensions") or fallback_dims
+                chunk["pages"].add(p)
+                _append_bbox(p, entry.get("box"), dims, tag)
+
         def _standalone_block_chunk(*, page_no: int, page_dims: dict, text: str, bbox, tag: str) -> dict:
             bboxes = []
             if bbox and is_valid_highlight_bbox(
@@ -219,22 +227,19 @@ class ChunkingService:
                     save_chunk()
                     chunk["content"].append(text)
                     chunk["tokens"] += tokens
-                    chunk["pages"].add(page_no)
-                    _append_bbox(page_no, bbox, page_dims, tag)
+                    _add_text_geometry(element, page_no, bbox, page_dims, tag)
                     save_chunk()
 
                 elif chunk["tokens"] + space_needed > self.CHUNK_SIZE:
                     save_chunk()
                     chunk["content"].append(text)
                     chunk["tokens"] += tokens
-                    chunk["pages"].add(page_no)
-                    _append_bbox(page_no, bbox, page_dims, tag)
+                    _add_text_geometry(element, page_no, bbox, page_dims, tag)
 
                 else:
                     chunk["content"].append(text)
                     chunk["tokens"] += space_needed
-                    chunk["pages"].add(page_no)
-                    _append_bbox(page_no, bbox, page_dims, tag)
+                    _add_text_geometry(element, page_no, bbox, page_dims, tag)
 
         save_chunk()
         merge_small_chunks()
