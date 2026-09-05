@@ -123,10 +123,12 @@ class LocalRAGPipeline(BaseRAGPipeline):
         return self.reranker
 
     def create_reranker(self, top_n: int | None = None):
-        return FlagEmbeddingReranker(
-            model=_RERANK_MODEL,
-            top_n=top_n or self.config.TOP_N,
-        )
+        n = top_n or self.config.TOP_N
+        reranker = getattr(self, "reranker", None)
+        if reranker is None:
+            return FlagEmbeddingReranker(model=_RERANK_MODEL, top_n=n)
+        reranker.top_n = n
+        return reranker
 
     def _files_dir(self, session_id: str) -> str:
         return os.path.join(os.path.dirname(DEFAULT_DB_PATH), "sessions", session_id, "source_files")
