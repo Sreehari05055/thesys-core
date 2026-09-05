@@ -104,6 +104,7 @@ class LocalRAGPipeline(BaseRAGPipeline):
         super().__init__()
         os.makedirs(_CHROMA_DIR, exist_ok=True)
         self._client = chromadb.PersistentClient(path=_CHROMA_DIR)
+        self._collections = {}
         
         self.doc_embed_model = HuggingFaceEmbedding(
             model_name=_EMBED_MODEL,
