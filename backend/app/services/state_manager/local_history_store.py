@@ -166,8 +166,8 @@ class LocalHistoryStore(BaseHistoryStore):
                     "doc_id": src["doc_id"],
                     "title": src["title"],
                     "pages": json.loads(src["pages"]) if src["pages"] else [],
-                    "bbox": json.loads(src["bbox"]) if src["bbox"] else None,
-                    "precise_bbox": json.loads(src["precise_bbox"]) if src["precise_bbox"] else None,
+                    "bboxes": json.loads(src["bbox"]) if src["bbox"] else [],
+                    "precise_bboxes": json.loads(src["precise_bbox"]) if src["precise_bbox"] else [],
                     "score": src["score"],
                     "content": src["content"],
                 }
