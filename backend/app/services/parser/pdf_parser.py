@@ -90,6 +90,18 @@ class PDFExtractor:
         prov = getattr(item, "prov", None) or []
         return int(prov[0].page_no) if prov else None
 
+    @staticmethod
+    def _page_bboxes(item, page_heights: dict | None = None) -> list[dict]:
+        """One highlight box per Docling provenance (wrapping text has a box on each page)."""
+        out = []
+        for prov in getattr(item, "prov", None) or []:
+            page_no = int(prov.page_no)
+            ph = (page_heights or {}).get(page_no)
+            bbox = prov.bbox
+            box = bbox.to_top_left_origin(ph).as_tuple() if ph else bbox.as_tuple()
+            out.append({"page": page_no, "box": box})
+        return out
+
     def _item_content(self, item, doc) -> str:
         if isinstance(item, PictureItem):
             return item.caption_text(doc).strip()
@@ -98,7 +110,7 @@ class PDFExtractor:
         return clean_for_embeddings((getattr(item, "text", None) or "").strip())
 
     def _item_to_element(
-        self, item, doc, page_height: float | None = None
+        self, item, doc, page_height: float | None = None, page_heights: dict | None = None
     ) -> tuple[dict, int] | None:
         label = getattr(item, "label", None)
         if label in _SKIP_LABELS:
@@ -122,6 +134,7 @@ class PDFExtractor:
             "tag": tag,
             "type": tag,
             "bbox": self._bbox_tuple(item, page_height),
+            "page_bboxes": self._page_bboxes(item, page_heights),
         }
         return element, page_no
 
@@ -205,7 +218,7 @@ class PDFExtractor:
                 if getattr(item, "self_ref", None) in skip_caption_refs:
                     continue
 
-                parsed = self._item_to_element(item, doc, page_height)
+                parsed = self._item_to_element(item, doc, page_height, page_heights)
                 if not parsed:
                     continue
                 element, page_no = parsed
