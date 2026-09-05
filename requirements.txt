@@ -1,0 +1,38 @@
+# THESYS — direct third-party dependencies used by app/.
+# Install: pip install -r requirements.txt
+
+# --- API server ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+httpx>=0.27.0
+itsdangerous>=2.0.0
+
+# --- Config & models ---
+python-dotenv>=1.0.0
+pydantic>=2.8.0
+
+# --- LlamaIndex RAG (Chroma + BGE embed + FlagEmbedding rerank) ---
+llama-index-core>=0.14.0
+llama-index-embeddings-huggingface>=0.6.0
+llama-index-vector-stores-chroma>=0.5.0
+llama-index-postprocessor-flag-embedding-reranker>=0.4.0
+chromadb>=1.0.0
+sentence-transformers>=3.0.0
+FlagEmbedding>=1.3.0
+
+# --- LangChain chat ---
+langchain-core>=1.0.0
+langchain-openai>=1.0.0
+openai>=1.40.0
+
+# --- Local models / hardware ---
+transformers>=4.40.0
+torch>=2.0.0
+psutil>=5.9.0
+
+# --- Tokenization / PDF / text cleanup ---
+docling>=2.0.0
+pymupdf>=1.24.0
+ftfy>=6.2.0
+clean-text>=0.6.0
