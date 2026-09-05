@@ -22,7 +22,7 @@ class ModelConfig:
 class RAGConfig:
     child_chunk_size: int = 64
     parent_chunk_size: int = 448
-    top_k: int = 5
+    top_k: int = 20
     top_n: int = 8
     max_pdf_pages: int = 40
 

@@ -94,7 +94,7 @@ class BaseRAGPipeline(ABC):
         """
         Vector search + rerank using ``session_indices[session_id]`` (caller must set index).
         """
-        top_k = search_params.get("top_k")
+        top_k = search_params.get("top_k") or self.config.TOP_K
         top_n = search_params.get("top_n") or self.config.TOP_N
         doc_ids = search_params.get("doc_ids") or []
 
