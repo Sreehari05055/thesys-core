@@ -132,7 +132,11 @@ class LocalRAGPipeline(BaseRAGPipeline):
         return os.path.join(os.path.dirname(DEFAULT_DB_PATH), "sessions", session_id, "source_files")
 
     def _collection(self, session_id: str):
-        return self._client.get_or_create_collection(name=session_id)
+        col = self._collections.get(session_id)
+        if col is None:
+            col = self._client.get_or_create_collection(name=session_id)
+            self._collections[session_id] = col
+        return col
 
     def _vector_store(self, session_id: str) -> ChromaVectorStore:
         return ChromaVectorStore(chroma_collection=self._collection(session_id))
@@ -151,6 +155,8 @@ class LocalRAGPipeline(BaseRAGPipeline):
         return index
 
     async def _load_index(self, session_id: str):
+        if session_id in BaseRAGPipeline.session_indices:
+            return
         BaseRAGPipeline.session_indices[session_id] = self._fresh_index(session_id)
 
     async def _add_to_index(self, session_id: str, file_paths: List[str]):
@@ -171,6 +177,7 @@ class LocalRAGPipeline(BaseRAGPipeline):
 
     async def delete_session_vectors(self, session_id: str) -> None:
         BaseRAGPipeline.session_indices.pop(session_id, None)
+        self._collections.pop(session_id, None)
         try:
             self._client.delete_collection(session_id)
         except Exception:
