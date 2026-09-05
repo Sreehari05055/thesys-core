@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Authenticated workspace routes are marked noindex in page metadata.
+Disallow: /reader

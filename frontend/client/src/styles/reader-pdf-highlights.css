@@ -1,0 +1,104 @@
+/* Source/passage bbox highlights — separate from text selection styling */
+.reader-pdf-page .pdf-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.reader-pdf-page .pdf-highlight-overlay {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 3px;
+  background-color: rgba(255, 250, 20, 0.55);
+  border: none;
+  mix-blend-mode: multiply;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 180ms ease-out;
+}
+
+.reader-pdf-page .pdf-highlight-overlay.is-fading {
+  opacity: 0;
+}
+
+/* Interactive regions from /regions API (table, code, …) */
+.reader-pdf-page .pdf-region-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.reader-pdf-page .pdf-region {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  /* Never intercept the pointer: an auto overlay above the text layer blocks
+     drag-selection of the text underneath it. Only the Ask button is clickable. */
+  pointer-events: none;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.reader-pdf-page:hover .pdf-region {
+  background: rgba(96, 165, 250, 0.08);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.reader-pdf-page .pdf-region-ask {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  appearance: none;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgb(24 24 27);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.reader-pdf-page .pdf-region-ask svg {
+  color: hsl(var(--primary));
+  flex-shrink: 0;
+}
+
+.reader-pdf-page:hover .pdf-region .pdf-region-ask,
+.reader-pdf-page .pdf-region:focus-within .pdf-region-ask {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.reader-pdf-page .pdf-region-ask:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  background: rgb(39 39 42);
+}
+
+.reader-pdf-page .pdf-region-ask:focus-visible {
+  outline: 2px solid hsl(var(--primary) / 0.55);
+  outline-offset: 1px;
+}
