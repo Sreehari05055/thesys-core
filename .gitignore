@@ -1,1 +1,40 @@
+# secrets
 .env
+!.env.example
+
+# python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+
+# local data / models cache
+data/
+*.db
+.chroma/
+chroma/
+
+# logs
+*.log
+app_errors.log
+
+# node / frontend build
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
