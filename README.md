@@ -21,7 +21,7 @@ Local research workspace: search open-access papers, upload PDFs, ask questions 
 
 ![Reader mode](screenshots/reader_mode.png)
 
-**Document summaries.** Follow a general format of problem statement, methodology, key findings, limitations, and metrics. Citations still jump to the highlighted passage.
+**Document summaries.** Follows a general format of problem statement, methodology, key findings, limitations, and metrics. Citations still jump to the highlighted passage.
 
 ![Document summary](screenshots/summary.png)
 
@@ -48,8 +48,7 @@ PDFs, vectors, and chat history stay on disk under `backend/data/`. First ingest
 
 ## Requirements
 
-- Python 3.11+
-- Node.js 20+
+- Python 3.11+ and Node.js 20+ (local run), **or** Docker
 - An OpenAI API key
 
 ## Setup
@@ -80,6 +79,24 @@ npm run dev
 ```
 
 Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The UI talks to `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`).
+
+## Docker
+
+Copy `backend/.env.example` to `backend/.env` and set `OPENAI_API_KEY` and `EMAIL`. Then:
+
+```bash
+docker compose up --build
+```
+
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). First build is large (CPU PyTorch, Docling). First ingest still downloads Hugging Face weights inside the container.
+
+Stop without deleting papers or chat history:
+
+```bash
+docker compose down
+```
+
+That keeps the `thesys-data` volume. `docker compose down -v` deletes it.
 
 ## Later
 
