@@ -1,9 +1,13 @@
+<div align="center">
+
 # Thesys
 
 [![GitHub stars](https://img.shields.io/github/stars/Sreehari05055/thesys-core)](https://github.com/Sreehari05055/thesys-core/stargazers)
 [![License: AGPL-3.0](https://img.shields.io/github/license/Sreehari05055/thesys-core)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/Sreehari05055/thesys-core)](https://github.com/Sreehari05055/thesys-core/commits)
 [![Issues](https://img.shields.io/github/issues/Sreehari05055/thesys-core)](https://github.com/Sreehari05055/thesys-core/issues)
+
+</div>
 
 Local research workspace: search open-access papers, upload PDFs, ask questions with on-page highlights, and export citations.
 
