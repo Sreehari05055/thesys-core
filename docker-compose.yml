@@ -1,0 +1,13 @@
+services:
+  thesys:
+    build: .
+    ports:
+      - "5000:5000"
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    volumes:
+      - thesys-data:/app/backend/data
+
+volumes:
+  thesys-data:
