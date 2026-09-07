@@ -102,6 +102,7 @@ That keeps the `thesys-data` volume. `docker compose down -v` deletes it.
 
 - [ ] Optional Cohere embeddings and reranker for users who want higher retrieval quality. Local BGE stays the default.
 - [ ] Optional ingest tradeoff: PyMuPDF when you want speed, Docling when you want layout quality.
+- [ ] Per-chat settings: saved title, selected model, and reasoning effort.
 
 ## License
 
