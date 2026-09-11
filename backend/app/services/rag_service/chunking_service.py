@@ -7,6 +7,31 @@ from app.utils.reference_section import (
     is_reference_section_heading,
 )
 
+
+def _box(page, box, dims, tag=None):
+    if not box or not is_valid_highlight_bbox(box, dims.get("width"), dims.get("height")):
+        return None
+    return {
+        "page": page,
+        "box": box,
+        "page_width": dims.get("width"),
+        "page_height": dims.get("height"),
+        "page_rotation": dims.get("rotation", 0),
+        "tag": tag,
+    }
+
+
+def _paint(line):
+    return {
+        "page": line["page"],
+        "box": line["box"],
+        "page_width": line["page_width"],
+        "page_height": line["page_height"],
+        "page_rotation": line.get("page_rotation", 0),
+        "tag": line.get("tag"),
+    }
+
+
 class ChunkingService:
     """Token-budget PDF chunking; each chunk stays under ``config.PARENT_CHUNK_SIZE`` tokens."""
 
