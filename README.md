@@ -11,7 +11,7 @@
 
 Local research workspace: search open-access papers, upload PDFs, ask questions with on-page highlights, and export citations.
 
-![On-PDF highlights from cited passages](screenshots/visual_highlights.png)
+![Full on-PDF highlights from a cited passage](screenshots/full_highlights.png)
 
 ## Features
 
