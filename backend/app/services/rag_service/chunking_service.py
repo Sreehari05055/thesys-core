@@ -124,17 +124,57 @@ class ChunkingService:
                     _add_text_geometry(element, page_no, bbox, page_dims, tag)
                     save_chunk()
 
-                elif chunk["tokens"] + space_needed > self.CHUNK_SIZE:
-                    save_chunk()
-                    chunk["content"].append(text)
-                    chunk["tokens"] += tokens
-                    _add_text_geometry(element, page_no, bbox, page_dims, tag)
+    def _pack_lines(self, lines: list) -> list:
+        groups, texts, boxes, pages = [], [], [], set()
+        def emit():
+            if not texts:
+                return
+            groups.append({"text": self.SEP.join(texts), "bboxes": list(boxes), "pages": sorted(pages)})
+            texts.clear()
+            boxes.clear()
+            pages.clear()
+        for line in lines:
+            nxt = texts + [line["text"]]
+            if texts and tokenizer_manager.count_tokens(self.SEP.join(nxt)) > self.CHILD_CHUNK_SIZE:
+                emit()
+            texts.append(line["text"])
+            boxes.append(_paint(line))
+            pages.add(line["page"])
+        emit()
+        return groups
 
-                else:
-                    chunk["content"].append(text)
-                    chunk["tokens"] += space_needed
-                    _add_text_geometry(element, page_no, bbox, page_dims, tag)
-
-        save_chunk()
-        merge_small_chunks()
-        return chunks
+    def _to_children(self, parents: list, doc_id: str, doc_title: str) -> list:
+        rows = []
+        for idx, parent in enumerate(parents):
+            text = parent["content"].strip()
+            if not text:
+                continue
+            meta = parent["metadata"]
+            lines = parent.get("lines") or []
+            parent_boxes = meta.get("bboxes") or []
+            keep = (
+                tokenizer_manager.count_tokens(text) <= self.CHILD_CHUNK_SIZE
+                or meta.get("tag") in ("table", "code")
+                or not lines
+            )
+            pieces = (
+                [{"text": text, "bboxes": [_paint(ln) for ln in lines] or parent_boxes, "pages": meta.get("pages") or []}]
+                if keep else self._pack_lines(lines)
+            )
+            for g in pieces:
+                row = {
+                    "title": doc_title,
+                    "file_type": "pdf",
+                    "pages": g["pages"],
+                    "bboxes": g["bboxes"],
+                    "parent_id": f"{doc_id}_p{idx}",
+                    "parent_text": text,
+                    "parent_pages": meta.get("pages") or [],
+                    "parent_bboxes": parent_boxes,
+                }
+                if meta.get("reference_section"):
+                    row["reference_section"] = True
+                if meta.get("tag"):
+                    row["tag"] = meta["tag"]
+                rows.append({"content": g["text"], "metadata": row})
+        return rows
