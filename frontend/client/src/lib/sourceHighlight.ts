@@ -7,8 +7,8 @@ export type SourceJumpTarget = {
 };
 
 export function sourceJumpTarget(source: Source, page?: number): SourceJumpTarget {
-  const targetPage = page ?? source.pages?.[0] ?? source.bboxes?.[0]?.page ?? 1;
-  const allBboxes = (source.bboxes ?? [])
+  const targetPage = page ?? source.pages?.[0] ?? source.precise_bboxes?.[0]?.page ?? source.bboxes?.[0]?.page ?? 1;
+  const allBboxes = (source.precise_bboxes?.length ? source.precise_bboxes : source.bboxes ?? [])
     .filter((bbox) => Array.isArray(bbox.box) && bbox.box.length === 4)
     .map((bbox) => ({
       box: bbox.box,
