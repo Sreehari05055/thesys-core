@@ -94,7 +94,17 @@ class PDFExtractor:
     
     @staticmethod
     def _cell_box_tuple(cell, page_height: float | None) -> tuple[float, float, float, float] | None:
-        pass
+        if page_height:
+            cell.to_top_left_origin(page_height)
+        rect = getattr(cell, "rect", None)
+        if rect is None:
+            return None
+        bb = rect.to_bounding_box() if hasattr(rect, "to_bounding_box") else rect
+        if hasattr(bb, "to_top_left_origin") and page_height:
+            bb = bb.to_top_left_origin(page_height)
+        if hasattr(bb, "as_tuple"):
+            return bb.as_tuple()
+        return None
 
     @staticmethod
     def _lines_in_bbox(parsed, box: tuple, page_height: float | None) -> list:
