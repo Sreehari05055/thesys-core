@@ -39,17 +39,12 @@ class ChunkingService:
         self.CHUNK_SIZE = config.PARENT_CHUNK_SIZE
         self.CHILD_CHUNK_SIZE = config.CHILD_CHUNK_SIZE 
         self.SMALL_CHUNK_MAX_TOKENS = self.CHUNK_SIZE // 4
-        self.JOIN_SEPARATOR = " "
-        self.JOIN_COST = tokenizer_manager.count_tokens(self.JOIN_SEPARATOR)
+        self.SEP = " "
 
     def chunk_pdf_elements(self, pdf_page_data: dict, doc_id: str, doc_title: str) -> List[dict]:
-        """
-        Chunk PDF in reading order: body text by token budget; each table/code is its own chunk.
-        A table/code flushes the in-progress body chunk so later paragraphs start a new chunk.
-        """
-        chunks = []
-        chunk = {"content": [], "bboxes": [], "pages": set(), "tokens": 0}
-        in_reference_section = False
+        parents = []
+        buf = {"content": [], "bboxes": [], "pages": set(), "lines": []}
+        in_refs = False
 
         def save_chunk():
             """Save current chunk and reset."""
