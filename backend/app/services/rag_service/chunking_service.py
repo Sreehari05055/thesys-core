@@ -10,10 +10,9 @@ from app.utils.reference_section import (
 class ChunkingService:
     """Token-budget PDF chunking; each chunk stays under ``config.PARENT_CHUNK_SIZE`` tokens."""
 
-    def __init__(self, chunk_size: int | None = None):
-        self.CHUNK_SIZE = chunk_size if chunk_size is not None else config.PARENT_CHUNK_SIZE
-        if self.CHUNK_SIZE <= 0:
-            raise ValueError("chunk_size must be a positive integer")
+    def __init__(self):
+        self.CHUNK_SIZE = config.PARENT_CHUNK_SIZE
+        self.CHILD_CHUNK_SIZE = config.CHILD_CHUNK_SIZE 
         self.SMALL_CHUNK_MAX_TOKENS = self.CHUNK_SIZE // 4
         self.JOIN_SEPARATOR = " "
         self.JOIN_COST = tokenizer_manager.count_tokens(self.JOIN_SEPARATOR)
