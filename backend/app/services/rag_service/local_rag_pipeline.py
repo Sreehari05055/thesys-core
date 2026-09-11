@@ -27,7 +27,6 @@ _EXCLUDE_EMBED = [
     "reference_section",
     "parent_id",
     "parent_text",
-    "parent_child_index",
     "parent_pages",
     "parent_bboxes",
     "parent_reference_section",
