@@ -13,6 +13,8 @@ from docling_core.types.doc.document import CodeItem
 from app import logger
 from app.core.config import admin
 from app.core.tokenizer import tokenizer_manager
+from docling_core.types.doc.base import BoundingBox, CoordOrigin
+from docling_core.types.doc.page import TextCellUnit
 
 _SKIP_LABELS = frozenset(
     {
@@ -89,6 +91,14 @@ class PDFExtractor:
     def _primary_page(item) -> int | None:
         prov = getattr(item, "prov", None) or []
         return int(prov[0].page_no) if prov else None
+    
+    @staticmethod
+    def _cell_box_tuple(cell, page_height: float | None) -> tuple[float, float, float, float] | None:
+        pass
+
+    @staticmethod
+    def _lines_in_bbox(parsed, box: tuple, page_height: float | None) -> list:
+        pass  
 
     @staticmethod
     def _page_bboxes(item, page_heights: dict | None = None) -> list[dict]:
@@ -110,7 +120,7 @@ class PDFExtractor:
         return clean_for_embeddings((getattr(item, "text", None) or "").strip())
 
     def _item_to_element(
-        self, item, doc, page_height: float | None = None, page_heights: dict | None = None
+        self, item, doc, page_height: float | None = None, page_heights: dict | None = None, parsed_pages: dict | None = None,
     ) -> tuple[dict, int] | None:
         label = getattr(item, "label", None)
         if label in _SKIP_LABELS:
@@ -126,6 +136,14 @@ class PDFExtractor:
 
         tag = label.value if label is not None else type(item).__name__
         level = int(item.level) if isinstance(item, SectionHeaderItem) else 0
+        page_bboxes = self._page_bboxes(item, page_heights)
+        lines = []
+        for entry in page_bboxes:
+            p = entry["page"]
+            ph = (page_heights or {}).get(p)
+            parsed = (parsed_pages or {}).get(p)
+            for line in self._lines_in_bbox(parsed, entry.get("box"), ph):
+                lines.append({**line, "page": p})
 
         element = {
             "content": content,
@@ -135,6 +153,7 @@ class PDFExtractor:
             "type": tag,
             "bbox": self._bbox_tuple(item, page_height),
             "page_bboxes": self._page_bboxes(item, page_heights),
+            "lines": lines,
         }
         return element, page_no
 
