@@ -104,6 +104,7 @@ export function useChatPage() {
   const [pendingSourceRefs, setPendingSourceRefs] = useState<Source[]>([]);
   const [showRightPanel, setShowRightPanelState] = useState(false);
   const [showPDF, setShowPDF] = useState(false);
+  const [usePreciseSourceHighlight, setUsePreciseSourceHighlight] = useState(true);
   const [rightPanelTab, setRightPanelTabState] = useState<RightPanelTab>("sources");
   const [leftPanelMode, setLeftPanelMode] = useState<"chat" | "summary">("chat");
   const [activeSummaryTitle, setActiveSummaryTitle] = useState("");
@@ -179,9 +180,10 @@ export function useChatPage() {
   }, []);
 
   const selectSourceForPreview = useCallback(
-    (src: Source, opts?: { showPdf?: boolean }) => {
+    (src: Source, opts?: { showPdf?: boolean; preciseHighlight?: boolean }) => {
       setActiveExternalPaper(null);
       setActiveSource(src);
+      setUsePreciseSourceHighlight(opts?.preciseHighlight ?? true);
       openRightPanel("sources");
       if (opts?.showPdf) setShowPDF(true);
     },
@@ -1264,6 +1266,8 @@ export function useChatPage() {
     selectSourceForPreview,
     showPDF,
     setShowPDF,
+    usePreciseSourceHighlight,
+    setUsePreciseSourceHighlight,
     rightPanelTab,
     setRightPanelTab,
     leftPanelMode,
