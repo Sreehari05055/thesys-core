@@ -364,12 +364,14 @@ export function bboxesToCanvasRects(
   // Backend Docling bboxes: top-left origin + page_width/page_height metadata.
   // Skip PyMuPDF-era auto layout + text-layer snap (breaks block-level paragraph boxes).
   if (hasDoclingBboxMeta(bboxes)) {
-    return bboxes
-      .map((bbox) => {
-        const { width, height } = metaPageSize(bbox, pdfPageWidth, pdfPageHeight);
-        return mapBoxTopLeft(bbox.box, width, height, canvasCssWidth, canvasCssHeight);
-      })
-      .filter((rect) => rect.width > 0 && rect.height > 0);
+    return mergeCanvasRectsByLine(
+      bboxes
+        .map((bbox) => {
+          const { width, height } = metaPageSize(bbox, pdfPageWidth, pdfPageHeight);
+          return mapBoxTopLeft(bbox.box, width, height, canvasCssWidth, canvasCssHeight);
+        })
+        .filter((rect) => rect.width > 0 && rect.height > 0),
+    );
   }
 
   let rects: CanvasRect[];
