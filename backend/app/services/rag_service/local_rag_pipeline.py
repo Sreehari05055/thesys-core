@@ -232,20 +232,25 @@ class LocalRAGPipeline(BaseRAGPipeline):
         data = self._collection(session_id).get(include=["documents", "metadatas"])
         wanted = set(filenames) if filenames else None
         rows = []
+        seen_parents = set()
         for nid, text, meta in zip(data["ids"], data["documents"], data["metadatas"]):
             meta = meta or {}
             if meta.get("reference_section"):
                 continue
             if wanted and (meta.get("filename") or meta.get("title")) not in wanted:
                 continue
+            parent_id = meta.get("parent_id") or nid
+            if parent_id in seen_parents:
+                continue
+            seen_parents.add(parent_id)
             rows.append({
                 "chunk_id": nid,
-                "text": text or "",
+                "text": meta.get("parent_text") or text or "",
                 "doc_id": meta.get("doc_id") or "",
                 "filename": meta.get("filename") or "",
                 "title": meta.get("title") or "",
-                "pages": as_list(meta.get("pages")),
-                "bboxes": as_list(meta.get("bboxes")),
+                "pages": as_list(meta.get("parent_pages") or meta.get("pages")),
+                "bboxes": as_list(meta.get("parent_bboxes") or meta.get("bboxes")),
             })
         return rows
 
