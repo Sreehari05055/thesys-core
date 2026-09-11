@@ -263,7 +263,19 @@ class PDFExtractor:
                         "height": float(page.size.height),
                         "rotation": 0,
                     }
-
+            parsed_pages = {}
+            for page in result.pages:
+                if page.size:
+                    page_heights[page.page_no] = float(page.size.height)
+                    page_data[page.page_no]["page_dimensions"] = {
+                        "width": float(page.size.width),
+                        "height": float(page.size.height),
+                        "rotation": 0,
+                    }
+                parsed = getattr(page, "parsed_page", None)
+                if parsed is not None:
+                    parsed_pages[page.page_no] = parsed
+                    
             for item, _level in doc.iterate_items():
                 page_no = self._primary_page(item)
                 page_height = page_heights.get(page_no)
@@ -281,7 +293,7 @@ class PDFExtractor:
                 if getattr(item, "self_ref", None) in skip_caption_refs:
                     continue
 
-                parsed = self._item_to_element(item, doc, page_height, page_heights)
+                parsed = self._item_to_element(item, doc, page_height, page_heights, parsed_pages)
                 if not parsed:
                     continue
                 element, page_no = parsed
