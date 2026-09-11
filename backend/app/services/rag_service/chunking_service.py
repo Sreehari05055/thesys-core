@@ -33,7 +33,7 @@ def _paint(line):
 
 
 class ChunkingService:
-    """Token-budget PDF chunking; each chunk stays under ``config.PARENT_CHUNK_SIZE`` tokens."""
+    """Pack items into ~448-token parents, then embed ~64-token line children."""
 
     def __init__(self):
         self.CHUNK_SIZE = config.PARENT_CHUNK_SIZE
@@ -85,44 +85,94 @@ class ChunkingService:
             })
             reset()
 
-        for page_no in sorted(pdf_page_data.keys()):
+        def add(element, page_no, bbox, page_dims, tag):
+            for entry in element.get("page_bboxes") or [{"page": page_no, "box": bbox}]:
+                p = entry.get("page", page_no)
+                dims = pdf_page_data.get(p, {}).get("page_dimensions") or page_dims
+                buf["pages"].add(p)
+                rec = _box(p, entry.get("box"), dims, tag)
+                if rec:
+                    buf["bboxes"].append(rec)
+            for line in element.get("lines") or []:
+                p = line.get("page", page_no)
+                dims = pdf_page_data.get(p, {}).get("page_dimensions") or page_dims
+                rec = _box(p, line.get("box"), dims, tag)
+                text = (line.get("text") or "").strip()
+                if rec and text:
+                    buf["lines"].append({**rec, "text": text})
+
+        for page_no in sorted(pdf_page_data):
             page_info = pdf_page_data[page_no]
             page_dims = page_info.get("page_dimensions", {})
             for element in page_info.get("elements", []):
                 text = element.get("content", "")
-                tokens = element.get("tokens", 0)
                 bbox = element.get("bbox")
                 tag = element.get("tag")
 
                 if tag in ("table", "code"):
-                    save_chunk()
-                    standalone = _standalone_block_chunk(
-                        page_no=page_no,
-                        page_dims=page_dims,
-                        text=text,
-                        bbox=bbox,
-                        tag=tag,
-                    )
-                    if standalone["content"]:
-                        chunks.append(standalone)
+                    flush()
+                    rec = _box(page_no, bbox, page_dims, tag)
+                    body = (text or "").strip()
+                    if body:
+                        parents.append({
+                            "content": body,
+                            "metadata": {
+                                "title": doc_title,
+                                "pages": [page_no],
+                                "bboxes": [rec] if rec else [],
+                                "file_type": "pdf",
+                                "tag": tag,
+                            },
+                            "lines": [],
+                        })
                     continue
 
-                if not in_reference_section and tag == "section_header" and is_reference_section_heading(text):
-                    append_buffer_to_last_chunk()
-                    in_reference_section = True
+                if not in_refs and tag == "section_header" and is_reference_section_heading(text):
+                    flush(into_last=True)
+                    in_refs = True
+                elif in_refs and is_other_section_heading(text, tag):
+                    flush()
+                    in_refs = False
 
-                elif in_reference_section and is_other_section_heading(text, tag):
-                    save_chunk()
-                    in_reference_section = False
+                if buf["content"] and ntok(buf["content"] + [text]) > self.CHUNK_SIZE:
+                    flush()
+                buf["content"].append(text)
+                add(element, page_no, bbox, page_dims, tag)
+                if ntok(buf["content"]) > self.CHUNK_SIZE:
+                    flush()
 
-                space_needed = tokens + (self.JOIN_COST if chunk["content"] else 0)
-                
-                if tokens > self.CHUNK_SIZE:
-                    save_chunk()
-                    chunk["content"].append(text)
-                    chunk["tokens"] += tokens
-                    _add_text_geometry(element, page_no, bbox, page_dims, tag)
-                    save_chunk()
+        flush()
+        self._merge_small(parents)
+        return self._to_children(parents, doc_id, doc_title)
+
+    def _merge_small(self, parents: list) -> None:
+        if len(parents) < 2:
+            return
+        out, last_text = [], -1
+        for parent in parents:
+            meta = parent["metadata"]
+            if meta.get("tag") in ("table", "code"):
+                out.append(parent)
+                continue
+            tokens = tokenizer_manager.count_tokens(parent["content"])
+            if tokens >= self.SMALL_CHUNK_MAX_TOKENS:
+                out.append(parent)
+                last_text = len(out) - 1
+                continue
+            if last_text < 0:
+                out.append(parent)
+                continue
+            dst = out[last_text]
+            src = parent["content"].strip()
+            if src:
+                dst["content"] = f"{dst['content'].strip()}{self.SEP}{src}" if dst["content"].strip() else src
+            dst_meta, src_meta = dst["metadata"], parent["metadata"]
+            dst_meta["pages"] = sorted(set(dst_meta.get("pages") or []) | set(src_meta.get("pages") or []))
+            dst_meta["bboxes"] = (dst_meta.get("bboxes") or []) + (src_meta.get("bboxes") or [])
+            dst["lines"] = (dst.get("lines") or []) + (parent.get("lines") or [])
+            if src_meta.get("reference_section"):
+                dst_meta["reference_section"] = True
+        parents[:] = out
 
     def _pack_lines(self, lines: list) -> list:
         groups, texts, boxes, pages = [], [], [], set()
