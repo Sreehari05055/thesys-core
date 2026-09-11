@@ -98,7 +98,41 @@ class PDFExtractor:
 
     @staticmethod
     def _lines_in_bbox(parsed, box: tuple, page_height: float | None) -> list:
-        pass  
+        """LINE cells overlapping a paragraph bbox (same top-left space as prov)."""
+        if parsed is None or not box or len(box) < 4:
+            return []
+        x0, y0, x1, y1 = (float(v) for v in box[:4])
+        target = BoundingBox(l=x0, t=y0, r=x1, b=y1, coord_origin=CoordOrigin.TOPLEFT)
+        cells = []
+        getter = getattr(parsed, "get_cells_in_bbox", None)
+        if getter:
+            try:
+                cells = list(getter(TextCellUnit.LINE, target))
+            except TypeError:
+                try:
+                    cells = list(getter(target, TextCellUnit.LINE))
+                except TypeError:
+                    cells = list(getter(bbox=target, cell_unit=TextCellUnit.LINE))
+        if not cells:
+            raw = list(getattr(parsed, "textline_cells", None) or [])
+            for cell in raw:
+                cb = PDFExtractor._cell_box_tuple(cell, page_height)
+                if not cb:
+                    continue
+                cx0, cy0, cx1, cy1 = cb
+                if cx1 < x0 or x1 < cx0 or cy1 < y0 or y1 < cy0:
+                    continue
+                cells.append(cell)
+        out = []
+        for cell in cells:
+            text = clean_for_embeddings((getattr(cell, "text", None) or "").strip())
+            if not text:
+                continue
+            line_box = PDFExtractor._cell_box_tuple(cell, page_height)
+            if not line_box:
+                continue
+            out.append({"text": text, "box": line_box, "tokens": tokenizer_manager.count_tokens(text)})
+        return out
 
     @staticmethod
     def _page_bboxes(item, page_heights: dict | None = None) -> list[dict]:
