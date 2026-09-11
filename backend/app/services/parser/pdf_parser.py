@@ -255,14 +255,6 @@ class PDFExtractor:
 
             page_data = defaultdict(lambda: {"elements": []})
             page_heights: dict[int, float] = {}
-            for page in result.pages:
-                if page.size:
-                    page_heights[page.page_no] = float(page.size.height)
-                    page_data[page.page_no]["page_dimensions"] = {
-                        "width": float(page.size.width),
-                        "height": float(page.size.height),
-                        "rotation": 0,
-                    }
             parsed_pages = {}
             for page in result.pages:
                 if page.size:
