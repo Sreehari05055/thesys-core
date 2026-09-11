@@ -46,169 +46,44 @@ class ChunkingService:
         buf = {"content": [], "bboxes": [], "pages": set(), "lines": []}
         in_refs = False
 
-        def save_chunk():
-            """Save current chunk and reset."""
-            if chunk["tokens"] == 0:
+        def reset():
+            buf["content"].clear()
+            buf["bboxes"].clear()
+            buf["pages"].clear()
+            buf["lines"].clear()
+
+        def ntok(parts):
+            text = self.SEP.join(parts)
+            return tokenizer_manager.count_tokens(text) if text else 0
+
+        def flush(into_last=False):
+            if not buf["content"]:
                 return
-            metadata = {
+            if into_last and parents:
+                last = parents[-1]
+                extra = self.SEP.join(buf["content"])
+                if extra:
+                    last["content"] = f"{last['content']}{self.SEP}{extra}" if last["content"] else extra
+                meta = last["metadata"]
+                meta["pages"] = sorted(set(meta.get("pages") or []) | buf["pages"])
+                meta["bboxes"] = (meta.get("bboxes") or []) + buf["bboxes"]
+                last.setdefault("lines", []).extend(buf["lines"])
+                reset()
+                return
+            meta = {
                 "title": doc_title,
-                "pages": sorted(chunk["pages"]),
-                "bboxes": [
-                    b
-                    for b in chunk["bboxes"]
-                    if is_valid_highlight_bbox(
-                        b.get("box"),
-                        b.get("page_width"),
-                        b.get("page_height"),
-                    )
-                ],
+                "pages": sorted(buf["pages"]),
+                "bboxes": list(buf["bboxes"]),
                 "file_type": "pdf",
             }
-            if in_reference_section:
-                metadata["reference_section"] = True
-            chunks.append(
-                {
-                    "content": self.JOIN_SEPARATOR.join(chunk["content"]),
-                    "metadata": metadata,
-                }
-            )
-            chunk["content"].clear()
-            chunk["bboxes"].clear()
-            chunk["pages"].clear()
-            chunk["tokens"] = 0
-
-        def append_buffer_to_last_chunk():
-            if chunk["tokens"] == 0:
-                return
-            if not chunks:
-                save_chunk()
-                return
-            last = chunks[-1]
-            extra = self.JOIN_SEPARATOR.join(chunk["content"])
-            if extra:
-                last["content"] = (
-                    f"{last['content']}{self.JOIN_SEPARATOR}{extra}"
-                    if last["content"]
-                    else extra
-                )
-            meta = last["metadata"]
-            meta["pages"] = sorted(set(meta.get("pages") or []) | chunk["pages"])
-            valid_new_bboxes = [
-                b
-                for b in chunk["bboxes"]
-                if is_valid_highlight_bbox(
-                    b.get("box"),
-                    b.get("page_width"),
-                    b.get("page_height"),
-                )
-            ]
-            meta["bboxes"] = (meta.get("bboxes") or []) + valid_new_bboxes
-            chunk["content"].clear()
-            chunk["bboxes"].clear()
-            chunk["pages"].clear()
-            chunk["tokens"] = 0
-
-        def merge_small_chunks() -> None:
-            """
-            Merge small text chunks into adjacent text chunks.
-            """
-            if len(chunks) < 2:
-                return
-
-            def is_region(meta: dict) -> bool:
-                return meta.get("tag") in ("table", "code")
-
-            out: List[dict] = []
-            last_text_idx = -1
-
-            for c in chunks:
-                c_meta = c["metadata"]
-
-                if is_region(c_meta):
-                    out.append(c)
-                    continue
-
-                tokens = tokenizer_manager.count_tokens(c["content"])
-                if tokens >= self.SMALL_CHUNK_MAX_TOKENS:
-                    out.append(c)
-                    last_text_idx = len(out) - 1
-                    continue
-
-                if last_text_idx < 0:
-                    out.append(c)
-                    continue
-
-                dst = out[last_text_idx]
-                dst_meta = dst["metadata"]
-
-                src_text = c["content"].strip()
-                dst_text = dst["content"].strip()
-                if src_text:
-                    dst["content"] = (
-                        f"{dst_text}{self.JOIN_SEPARATOR}{src_text}" if dst_text else src_text
-                    )
-
-                dst_meta["pages"] = sorted(
-                    set(dst_meta.get("pages") or []) | set(c_meta.get("pages") or [])
-                )
-                dst_meta["bboxes"] = (dst_meta.get("bboxes") or []) + (c_meta.get("bboxes") or [])
-                if c_meta.get("reference_section"):
-                    dst_meta["reference_section"] = True
-
-            chunks[:] = out
-
-        def _append_bbox(page_no: int, bbox, page_dims: dict, tag: str | None = None) -> None:
-            if bbox and is_valid_highlight_bbox(
-                bbox,
-                page_dims.get("width"),
-                page_dims.get("height"),
-            ):
-                chunk["bboxes"].append(
-                    {
-                        "page": page_no,
-                        "box": bbox,
-                        "page_width": page_dims.get("width"),
-                        "page_height": page_dims.get("height"),
-                        "page_rotation": page_dims.get("rotation", 0),
-                        "tag": tag,
-                    }
-                )
-
-        def _add_text_geometry(element, fallback_page, fallback_bbox, fallback_dims, tag) -> None:
-            boxes = element.get("page_bboxes") or [{"page": fallback_page, "box": fallback_bbox}]
-            for entry in boxes:
-                p = entry.get("page", fallback_page)
-                dims = pdf_page_data.get(p, {}).get("page_dimensions") or fallback_dims
-                chunk["pages"].add(p)
-                _append_bbox(p, entry.get("box"), dims, tag)
-
-        def _standalone_block_chunk(*, page_no: int, page_dims: dict, text: str, bbox, tag: str) -> dict:
-            bboxes = []
-            if bbox and is_valid_highlight_bbox(
-                bbox,
-                page_dims.get("width"),
-                page_dims.get("height"),
-            ):
-                bboxes.append(
-                    {
-                        "page": page_no,
-                        "box": bbox,
-                        "page_width": page_dims.get("width"),
-                        "page_height": page_dims.get("height"),
-                        "page_rotation": page_dims.get("rotation", 0),
-                        "tag": tag,
-                    }
-                )
-            return {
-                "content": (text or "").strip(),
-                "metadata": {
-                    "title": doc_title,
-                    "pages": [page_no],
-                    "bboxes": bboxes,
-                    "file_type": "pdf",
-                    "tag": tag,
-                },
-            }
+            if in_refs:
+                meta["reference_section"] = True
+            parents.append({
+                "content": self.SEP.join(buf["content"]),
+                "metadata": meta,
+                "lines": list(buf["lines"]),
+            })
+            reset()
 
         for page_no in sorted(pdf_page_data.keys()):
             page_info = pdf_page_data[page_no]
