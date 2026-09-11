@@ -15,7 +15,9 @@ Local research workspace: search open-access papers, upload PDFs, ask questions 
 
 ## Features
 
-**Chat over your research papers.** Answers cite sources in the document. Click a citation to jump the preview and highlight the passage.
+**Chat over your research papers.** Answers cite sources in the document. Click a citation to jump the preview. **Full** highlights the whole retrieved passage; **Focused** (default) paints a tighter highlight on the same passage. Toggle in the PDF header.
+
+![Focused line highlights vs Full passage](screenshots/precise_highlights.png)
 
 **Reader mode.** Open a paper full-width, select text, and ask about that span.
 
@@ -101,7 +103,6 @@ That keeps the `thesys-data` volume. `docker compose down -v` deletes it.
 ## Later
 
 - [ ] Optional Cohere embeddings and reranker for users who want higher retrieval quality. Local BGE stays the default.
-- [ ] Full vs focused highlights from Docling: paragraph boxes for the full span, line cells inside that box for focused retrieval highlights.
 - [ ] Per-chat settings: saved title, selected model, and reasoning effort.
 
 ## License
