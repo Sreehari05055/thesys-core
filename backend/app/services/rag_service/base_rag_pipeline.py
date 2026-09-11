@@ -80,7 +80,7 @@ class BaseRAGPipeline(ABC):
         meta = getattr(target, "metadata", None) or {}
         return bool(meta.get("reference_section"))
 
-    def _candidates_for_rerank(self, nodes: list) -> list:
+    def _remove_reference_sections(self, nodes: list) -> list:
         """Exclude bibliography/reference chunks from reranking candidates."""
         return [n for n in nodes if not self._node_is_reference_section(n)]
 
@@ -126,7 +126,8 @@ class BaseRAGPipeline(ABC):
             return []
 
         unique_results = await self._remove_duplicates(flattened_results)
-        candidates = self._candidates_for_rerank(unique_results)
+        diverse = self._best_child_per_parent(unique_results)
+        candidates = self._remove_reference_sections(diverse)
         final_results = await self._global_reranker(candidates, user_query, top_n=top_n)
         chunk_ids = [n.node.id_ for n in final_results]
         embedding_map = await self._fetch_embeddings(session_id, chunk_ids)
@@ -227,6 +228,21 @@ class BaseRAGPipeline(ABC):
         except Exception as e:
             logger.error(f"Error in global reranker: {e}", exc_info=True)
             return content[:top_n]
+
+    @staticmethod
+    def _best_child_per_parent(nodes: list) -> list:
+        """Drop extra children of the same parent; keep the highest retrieval score."""
+        best: dict = {}
+        for n in nodes:
+            meta = getattr(getattr(n, "node", n), "metadata", None) or {}
+            pid = meta.get("parent_id") or getattr(getattr(n, "node", n), "id_", None) or id(n)
+            score = n.score if getattr(n, "score", None) is not None else float("-inf")
+            prev = best.get(pid)
+            if prev is None or score > (prev.score if prev.score is not None else float("-inf")):
+                best[pid] = n
+        ranked = list(best.values())
+        ranked.sort(key=lambda n: n.score if n.score is not None else float("-inf"), reverse=True)
+        return ranked
 
     async def _remove_duplicates(self, content: list):
         """Deduplicate nodes by content hash."""
