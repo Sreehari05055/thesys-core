@@ -46,7 +46,7 @@ admin = AdminConfig(
     rag=RAGConfig(
         child_chunk_size=64,
         parent_chunk_size=448,
-        top_k=30,
+        top_k=10,
         top_n=8,
         max_pdf_pages=150,
     ),
