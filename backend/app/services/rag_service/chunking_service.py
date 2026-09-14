@@ -109,7 +109,7 @@ class ChunkingService:
                 bbox = element.get("bbox")
                 tag = element.get("tag")
 
-                if tag in ("table", "code"):
+                if tag in ("table", "code", "picture", "chart"):
                     flush()
                     rec = _box(page_no, bbox, page_dims, tag)
                     body = (text or "").strip()
@@ -151,7 +151,7 @@ class ChunkingService:
         out, last_text = [], -1
         for parent in parents:
             meta = parent["metadata"]
-            if meta.get("tag") in ("table", "code"):
+            if meta.get("tag") in ("table", "code", "picture", "chart"):
                 out.append(parent)
                 continue
             tokens = tokenizer_manager.count_tokens(parent["content"])
@@ -204,7 +204,7 @@ class ChunkingService:
             parent_boxes = meta.get("bboxes") or []
             keep = (
                 tokenizer_manager.count_tokens(text) <= self.CHILD_CHUNK_SIZE
-                or meta.get("tag") in ("table", "code")
+                or meta.get("tag") in ("table", "code", "picture", "chart")
                 or not lines
             )
             pieces = (
