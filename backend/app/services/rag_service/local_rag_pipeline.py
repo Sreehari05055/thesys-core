@@ -15,7 +15,7 @@ from app.services.rag_service.chunking_service import ChunkingService
 from app.utils.bbox_utils import as_list, filter_highlight_bboxes
 from app.core.config import config
 
-_REGION_TAGS = frozenset({"table", "code"})
+_REGION_TAGS = frozenset({"table", "code", "picture", "chart"})
 _CHROMA_DIR = os.path.join(os.path.dirname(DEFAULT_DB_PATH), "chroma")
 _EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 _RERANK_MODEL = "BAAI/bge-reranker-base"
