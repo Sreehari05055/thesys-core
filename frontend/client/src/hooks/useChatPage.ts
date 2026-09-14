@@ -466,6 +466,7 @@ export function useChatPage() {
         setActiveSummaryTitle(title);
         setActiveSummaryId(summaryId);
         setLeftPanelMode("summary");
+        setUsePreciseSourceHighlight(false);
         setShowRightPanelState(true);
         setRightPanelTabState(rightTab);
         setShowPDF(false);

@@ -195,7 +195,12 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
                                   <button
                                     type="button"
                                     className="w-full text-left p-3"
-                                    onClick={() => selectSourceForPreview(src, { showPdf: true })}
+                                    onClick={() =>
+                                      selectSourceForPreview(src, {
+                                        showPdf: true,
+                                        preciseHighlight: !viewingSummary,
+                                      })
+                                    }
                                   >
                                     <div className="flex items-center gap-2.5 mb-2">
                                       <div className="h-7 w-7 rounded-md bg-primary/12 flex items-center justify-center text-primary font-bold text-[11px] shrink-0 group-hover:bg-primary/20 transition-colors">

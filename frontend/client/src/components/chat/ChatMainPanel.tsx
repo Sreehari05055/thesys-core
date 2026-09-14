@@ -178,7 +178,9 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
               <DocumentSummaryView
                 summary={documentSummary}
                 isLoading={summaryLoading}
-                onSourceClick={(src) => selectSourceForPreview(src, { showPdf: true })}
+                onSourceClick={(src) =>
+                  selectSourceForPreview(src, { showPdf: true, preciseHighlight: false })
+                }
               />
             ) : libraryView ? (
               <MyLibraryPanel model={model} />
