@@ -147,7 +147,9 @@ class PDFExtractor:
 
     def _item_content(self, item, doc) -> str:
         if isinstance(item, PictureItem):
-            return item.caption_text(doc).strip()
+            caption = item.caption_text(doc)
+            desc = getattr(getattr(item.meta, "description", None), "text", "") or ""
+            return clean_for_embeddings(f"{caption}\n{desc}")
         if getattr(item, "label", None) == DocItemLabel.FORMULA:
             return (getattr(item, "orig", None) or getattr(item, "text", None) or "").strip()
         return clean_for_embeddings((getattr(item, "text", None) or "").strip())
