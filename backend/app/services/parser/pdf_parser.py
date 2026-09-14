@@ -6,12 +6,13 @@ import ftfy
 from cleantext import clean
 from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
+from docling.datamodel.pipeline_options import PdfPipelineOptions, PictureDescriptionApiOptions, TableFormerMode
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc import CodeItem, DocItemLabel, PictureItem, SectionHeaderItem, TableItem
 from docling_core.types.doc.document import CodeItem
 from app import logger
-from app.core.config import admin
+from pydantic import AnyUrl
+from app.core.config import admin, config
 from docling_core.types.doc.base import BoundingBox, CoordOrigin
 from docling_core.types.doc.page import TextCellUnit
 
@@ -54,6 +55,23 @@ def _build_converter() -> DocumentConverter:
         accelerator_options=accel,
     )
     opts.table_structure_options.mode = TableFormerMode.ACCURATE
+    opts.do_picture_description = True
+    opts.enable_remote_services = True
+    opts.picture_description_options = PictureDescriptionApiOptions(
+        url=AnyUrl("https://api.openai.com/v1/chat/completions"),
+        headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
+        params={
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "low",
+        },
+        timeout=60.0,
+        prompt=(
+        "Describe this paper figure for search. Cover the figure type "
+        "(plot, diagram, photo, schematic), axes/labels, what is shown, "
+        "and any numbers or conclusions visible. Skip decorative chrome."
+        ), 
+    )
+
     return DocumentConverter(
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
     )
