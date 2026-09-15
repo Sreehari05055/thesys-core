@@ -27,6 +27,10 @@ Local research workspace: search open-access papers, upload PDFs, ask questions 
 
 ![Document summary](screenshots/summary.png)
 
+**Figures and diagrams.** Ingest describes plots, pipelines, and other figures so chat and summaries can cite them. Click a citation to highlight the figure on the page.
+
+![Figure citation highlight](screenshots/image_support.png)
+
 **Discover papers.** Search the web (OpenAlex) from the chat, preview a record, open the link, or add it to the library.
 
 ![Paper search](screenshots/search_papers.png)
@@ -103,6 +107,7 @@ That keeps the `thesys-data` volume. `docker compose down -v` deletes it.
 ## Later
 
 - [ ] Optional Cohere embeddings and reranker for users who want higher retrieval quality. Local BGE stays the default.
+- [ ] OCR for scanned PDFs so image-only pages can be searched and highlighted like born-digital papers.
 - [ ] Per-chat settings: saved title, selected model, and reasoning effort.
 
 ## License
