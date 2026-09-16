@@ -153,6 +153,20 @@ export function useChatPage() {
   // ── Sidebar ──
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+  const deleteChatControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => deleteChatControllerRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (!activeChatId || chats.some((chat) => chat.id === activeChatId)) return;
+    const next = chats[0]?.id ?? null;
+    setActiveChatId(next);
+    if (!next) {
+      setActiveSource(null);
+      setShowRightPanelState(false);
+    }
+  }, [activeChatId, chats]);
 
   // ── Refs ──
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -379,30 +393,41 @@ export function useChatPage() {
 
 
   const deleteChat = useCallback(
-    (chatId: string) => {
+    async (chatId: string): Promise<boolean> => {
       const chatToDelete = chats.find((c) => c.id === chatId);
-      if (!chatToDelete) return;
+      if (!chatToDelete || deleteChatControllerRef.current) return false;
 
-      // Call backend to delete conversation
-      apiFetch(API_URLS.deleteConversation, { method: "DELETE" }, chatToDelete.sessionId).catch(() => {
-        // ignore delete errors—proceed with local deletion anyway
-      });
-
-      setChats((prev) => {
-        const updated = prev.filter((c) => c.id !== chatId);
-        if (activeChatId === chatId) {
-          const next = updated.length > 0 ? updated[0].id : null;
-          setActiveChatId(next);
-          if (!next) {
-            setActiveSource(null);
-            setShowRightPanel(false);
-          }
+      const controller = new AbortController();
+      deleteChatControllerRef.current = controller;
+      setDeletingChatId(chatId);
+      const fallback = "The session could not be deleted. Please try again.";
+      try {
+        const res = await apiFetch(
+          API_URLS.deleteConversation,
+          { method: "DELETE", signal: controller.signal },
+          chatToDelete.sessionId,
+        );
+        if (!res.ok) throw new Error(await getApiErrorMessage(res, fallback));
+        if (controller.signal.aborted) return false;
+        setChats((prev) => prev.filter((c) => c.id !== chatId));
+        setMenuOpenId(null);
+        return true;
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          toast({
+            title: "Could not delete session",
+            description: error instanceof Error && !(error instanceof TypeError)
+              ? error.message : fallback,
+            variant: "destructive",
+          });
         }
-        return updated;
-      });
-      setMenuOpenId(null);
+        return false;
+      } finally {
+        deleteChatControllerRef.current = null;
+        setDeletingChatId(null);
+      }
     },
-    [activeChatId, chats],
+    [chats, toast],
   );
 
   const toggleChatDocSelection = useCallback((docId: string) => {
@@ -1311,6 +1336,7 @@ export function useChatPage() {
     menuRef,
     createNewChat,
     deleteChat,
+    deletingChatId,
     switchChat,
     toggleChatDocSelection,
     exitSummaryView,

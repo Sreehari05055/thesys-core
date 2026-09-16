@@ -72,6 +72,7 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
     setMenuOpenId,
     menuRef,
     deleteChat,
+    deletingChatId,
     sidebarView,
     openLibrary,
   } = model;
@@ -88,11 +89,12 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
     if (!sessionsExpanded) setMenuOpenId(null);
   }, [sessionsExpanded, setMenuOpenId]);
 
-  const closeDeleteDialog = () => setPendingDeleteChatId(null);
-  const confirmDeleteChat = () => {
-    if (!pendingDeleteChatId) return;
-    deleteChat(pendingDeleteChatId);
-    setPendingDeleteChatId(null);
+  const closeDeleteDialog = () => {
+    if (!deletingChatId) setPendingDeleteChatId(null);
+  };
+  const confirmDeleteChat = async () => {
+    if (!pendingDeleteChatId || deletingChatId) return;
+    if (await deleteChat(pendingDeleteChatId)) setPendingDeleteChatId(null);
   };
 
   return (
@@ -303,6 +305,7 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
             role="alertdialog"
             aria-labelledby="delete-chat-dialog-title"
             aria-describedby="delete-chat-dialog-description"
+            aria-busy={Boolean(deletingChatId)}
             className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
             data-testid="delete-chat-dialog"
@@ -317,6 +320,7 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
               <button
                 type="button"
                 onClick={closeDeleteDialog}
+                disabled={Boolean(deletingChatId)}
                 className="rounded-md border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition-colors"
                 data-testid="button-delete-chat-cancel"
               >
@@ -325,10 +329,11 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
               <button
                 type="button"
                 onClick={confirmDeleteChat}
+                disabled={Boolean(deletingChatId)}
                 className="rounded-md bg-destructive px-4 py-2 text-[13px] font-semibold text-white hover:bg-destructive/85 transition-colors"
                 data-testid="button-delete-chat-confirm"
               >
-                Delete
+                {deletingChatId ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>
