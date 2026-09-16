@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Chat deletion regression checks</title></head>
+  <body>
+    <h1>Chat deletion regression checks</h1>
+    <p>Run <code>npm run dev:client -- --host 127.0.0.1</code>, then open
+      <code>/tests/chat-deletion.html</code>. Uses synthetic data and mocked requests only.
+      Existing chat storage is restored when the checks finish.</p>
+    <pre id="results">Running…</pre>
+    <div id="fixture"></div>
+    <script type="module">
+      import { act, createElement, StrictMode } from "react";
+      import { createRoot } from "react-dom/client";
+      import { useChatPage } from "/src/hooks/useChatPage.ts";
+      import { ChatSidebar } from "/src/components/chat/ChatSidebar.tsx";
+      import { useToast } from "/src/hooks/use-toast.ts";
+
+      window.IS_REACT_ACT_ENVIRONMENT = true;
+      const results = document.getElementById("results");
+      const fixture = document.getElementById("fixture");
+      const originalFetch = window.fetch;
+      const keys = ["thesys_chats", "thesys_active_chat"];
+      const stored = keys.map((key) => localStorage.getItem(key));
+      let root, model, toasts, request, deleteCount = 0;
+      const passed = [];
+      const assert = (condition, message) => { if (!condition) throw new Error(message); };
+      const ids = () => model.chats.map((chat) => chat.id).sort().join(",");
+      const cachedIds = () => JSON.parse(localStorage.getItem(keys[0])).map((c) => c.id).sort().join(",");
+      const button = (id) => fixture.querySelector(`[data-testid="${id}"]`);
+      const click = async (id) => {
+        assert(button(id), `Missing ${id}`);
+        await act(async () => button(id).click());
+      };
+      const report = (name) => { passed.push(name); results.textContent = passed.map((s) => `PASS ${s}`).join("\n"); };
+      async function settle(action) {
+        await act(async () => action());
+        for (let i = 0; model.deletingChatId && i < 100; i++) {
+          await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+        }
+        assert(!model.deletingChatId, "Deletion did not settle");
+      }
+      function Harness() {
+        model = useChatPage();
+        toasts = useToast().toasts;
+        return createElement(ChatSidebar, { model });
+      }
+      window.fetch = async (url, init = {}) => {
+        if (init.method === "DELETE") {
+          deleteCount++;
+          return new Promise((resolve, reject) => {
+            request = { resolve, reject, signal: init.signal, session: new Headers(init.headers).get("X-Session-ID") };
+            init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+          });
+        }
+        assert(String(url).includes("/api/"), `Unexpected request: ${url}`);
+        return Response.json([]);
+      };
+      async function mount(seed = true) {
+        if (seed) {
+          localStorage.setItem(keys[0], JSON.stringify(["a", "b", "c"].map((id, i) => ({
+            id, sessionId: `session-${id}`, title: `Session ${id.toUpperCase()}`,
+            createdAt: 3 - i, messages: [{ sender: "user", text: `Message ${id}` }],
+          }))));
+          localStorage.setItem(keys[1], "a");
+        }
+        root = createRoot(fixture);
+        await act(async () => root.render(createElement(StrictMode, null, createElement(Harness))));
+      }
+      async function openDelete(id) {
+        await click(`button-chat-menu-${id}`);
+        await act(async () => {
+          const menu = button(`menu-chat-${id}`);
+          assert(menu, "Session menu is missing");
+          menu.querySelector("button").click();
+        });
+      }
+      try {
+        await mount();
+        await openDelete("a");
+        await click("button-delete-chat-confirm");
+        assert(ids() === "a,b,c" && cachedIds() === "a,b,c", "Pending deletion removed the conversation");
+        assert(model.activeChatId === "a" && model.messages[0].text === "Message a", "Pending deletion changed active messages");
+        assert(request.session === "session-a", "Wrong session header");
+        assert(button("button-delete-chat-confirm").disabled, "Delete is not disabled");
+        assert(button("button-delete-chat-confirm").textContent.includes("Deleting"), "Missing pending label");
+        await act(async () => { button("button-delete-chat-confirm").click(); });
+        await act(async () => { await model.deleteChat("a"); });
+        assert(deleteCount === 1, "Duplicate deletion request");
+        await click("delete-chat-dialog-backdrop");
+        assert(button("delete-chat-dialog"), "Pending dialog was dismissed");
+        report("Pending deletion preserves chat, messages and storage; duplicate requests are blocked");
+
+        await settle(() => request.resolve(Response.json({ error: "Server could not delete this session." }, { status: 500 })));
+        assert(ids() === "a,b,c" && cachedIds() === "a,b,c" && model.activeChatId === "a", "HTTP failure changed chat state");
+        assert(toasts[0].description === "Server could not delete this session.", "HTTP error not shown");
+        assert(button("delete-chat-dialog") && !button("button-delete-chat-confirm").disabled, "Cannot retry HTTP failure");
+        report("HTTP failure retains the conversation and offers retry");
+
+        await act(async () => root.unmount());
+        await mount(false);
+        assert(ids() === "a,b,c" && model.activeChatId === "a", "Failed deletion was not retained on remount");
+        report("Failed deletion survives remount from local storage");
+        await openDelete("a");
+        await click("button-delete-chat-confirm");
+        await settle(() => request.reject(new TypeError("Failed to fetch")));
+        assert(ids() === "a,b,c" && cachedIds() === "a,b,c", "Network failure removed chat");
+        assert(toasts[0].description === "The session could not be deleted. Please try again.", "Missing useful network error");
+        assert(button("delete-chat-dialog") && !button("button-delete-chat-confirm").disabled, "Cannot retry network failure");
+        report("Network failure retains the conversation and offers retry");
+
+        await click("button-delete-chat-confirm");
+        // Exercise a selection change through the hook while the modal request is pending.
+        await act(async () => model.switchChat("c"));
+        await settle(() => request.resolve(new Response(null, { status: 204 })));
+        assert(ids() === "b,c" && cachedIds() === "b,c", "Success did not remove only the target");
+        assert(model.activeChatId === "c" && model.messages[0].text === "Message c", "Deletion stole the new active selection");
+        assert(!button("delete-chat-dialog") && model.deletingChatId === null, "Success did not clear dialog and pending state");
+        report("Retry succeeds without stealing a changed active selection");
+
+        await openDelete("b");
+        await click("button-delete-chat-confirm");
+        await settle(() => request.resolve(Response.json({ message: "Deleted" })));
+        assert(ids() === "c" && model.activeChatId === "c", "Deleting an inactive chat changed selection");
+        report("Deleting an inactive conversation preserves the active conversation");
+
+        await openDelete("c");
+        await click("button-delete-chat-confirm");
+        await settle(() => request.resolve(new Response("not JSON", { status: 500 })));
+        assert(ids() === "c" && toasts[0].description.includes("Please try again"), "Non-JSON failure not handled");
+        await click("button-delete-chat-confirm");
+        await settle(() => request.resolve(new Response(null, { status: 204 })));
+        assert(ids() === "" && model.activeChatId === null && localStorage.getItem(keys[1]) === null, "Last-chat deletion did not clear selection");
+        report("Non-JSON errors allow retry; deleting the final conversation clears selection");
+
+        await act(async () => root.unmount());
+        await mount();
+        await openDelete("a");
+        await click("button-delete-chat-confirm");
+        await settle(() => request.resolve(Response.json({ message: "Deleted" })));
+        assert(ids() === "b,c" && model.activeChatId === "b", "Active deletion did not select the next conversation");
+        report("Deleting the active conversation selects a remaining conversation");
+
+        await openDelete("b");
+        await click("button-delete-chat-confirm");
+        await act(async () => root.unmount());
+        root = null;
+        assert(request.signal.aborted, "Unmount did not cancel pending request");
+        assert(cachedIds() === "b,c", "Unmount removed an unconfirmed conversation");
+        report("Unmount aborts the pending request without removing cached conversations");
+        results.textContent += `\n\nPASS: ${passed.length} regression checks`;
+      } catch (error) {
+        results.textContent += `\nFAIL: ${error.message}`;
+        console.error(error);
+      } finally {
+        if (root) await act(async () => root.unmount());
+        window.fetch = originalFetch;
+        keys.forEach((key, i) => stored[i] === null ? localStorage.removeItem(key) : localStorage.setItem(key, stored[i]));
+        window.IS_REACT_ACT_ENVIRONMENT = false;
+      }
+    </script>
+  </body>
+</html>
