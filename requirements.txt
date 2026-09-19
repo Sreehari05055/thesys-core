@@ -36,3 +36,5 @@ docling>=2.0.0
 pymupdf>=1.24.0
 ftfy>=6.2.0
 clean-text>=0.6.0
+rapidocr>=3.0.0
+onnxruntime>=1.18.0
