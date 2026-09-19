@@ -6,7 +6,7 @@ import ftfy
 from cleantext import clean
 from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, PictureDescriptionApiOptions, TableFormerMode
+from docling.datamodel.pipeline_options import PdfPipelineOptions,PictureDescriptionApiOptions, RapidOcrOptions,TableFormerMode
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc import CodeItem, DocItemLabel, PictureItem, SectionHeaderItem, TableItem
 from docling_core.types.doc.document import CodeItem
@@ -49,10 +49,11 @@ def _build_converter() -> DocumentConverter:
         num_threads=max(1, os.cpu_count() or 4),
     )
     opts = PdfPipelineOptions(
-        do_ocr=False,
+        do_ocr=True,
         do_table_structure=True,
         generate_parsed_pages=True,
         accelerator_options=accel,
+        ocr_options=RapidOcrOptions(backend="onnxruntime", lang=["english"]),
     )
     opts.table_structure_options.mode = TableFormerMode.ACCURATE
     opts.do_picture_description = True
