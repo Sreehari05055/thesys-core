@@ -78,7 +78,7 @@ class CitationsExecutionService:
             except Exception:
                 api_msg = exc.response.text
             logger.error(f"Error from CitationAPI ({exc.response.status_code}): {api_msg}", exc_info=True)
-            return f"Citation Tool Error ({exc.response.status_code}): {api_msg}"
+            return f"No citation available for {citation_input}"
         except httpx.RequestError as exc:
             logger.error(f"Citation API network error: {exc}", exc_info=True)
             return "Citation Tool Error: Could not connect to the service."

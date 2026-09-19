@@ -185,7 +185,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
             )
             results = []
             for citation_input, raw in zip(inputs, raw_results):
-                if isinstance(raw, str) and "Error" in raw:
+                if isinstance(raw, str):
                     results.append({"citation_input": citation_input, "citations": [], "error": raw})
                 else:
                     results.append({
