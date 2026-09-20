@@ -9,7 +9,7 @@
 
 </div>
 
-Local research workspace: search open-access papers, upload PDFs, ask questions with on-page highlights, and export citations.
+Local research workspace: search open-access papers (OpenAlex and arXiv), upload PDFs, ask questions with on-page highlights, and export citations.
 
 ![Full on-PDF highlights from a cited passage](screenshots/full_highlights.png)
 
@@ -31,7 +31,7 @@ Local research workspace: search open-access papers, upload PDFs, ask questions 
 
 ![Figure citation highlight](screenshots/image_support.png)
 
-**Discover papers.** Search the web (OpenAlex) from the chat, preview a record, open the link, or add it to the library.
+**Discover papers.** Search open-access literature from OpenAlex and arXiv in one pool, then preview a record, open the link, or add it to the library.
 
 ![Paper search](screenshots/search_papers.png)
 
@@ -46,8 +46,9 @@ Local research workspace: search open-access papers, upload PDFs, ask questions 
 - **Frontend:** React (Vite) on port `5000`
 - **Backend:** FastAPI on port `8000`
 - **Local RAG:** Docling ingest → Chroma + BGE embeddings → BGE reranker
+- **OCR:** off by default (`DO_OCR=false`); set `DO_OCR=true` for scanned PDFs
 - **Chat:** OpenAI via LangChain
-- **Paper search:** OpenAlex (optional API key)
+- **Paper search:** OpenAlex + arXiv (open-access; optional OpenAlex API key)
 - **Citations:** CiteAs (uses `EMAIL`)
 
 PDFs, vectors, and chat history stay on disk under `backend/data/`. First ingest downloads embedding/rerank weights (Hugging Face). GPU helps; CPU works and is slower.
@@ -71,7 +72,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Set at least `OPENAI_API_KEY` and `EMAIL` in `backend/.env`. `HF_TOKEN` is optional (Hugging Face rate limits). `OPENALEX_API_KEY` is optional.
+Set at least `OPENAI_API_KEY` and `EMAIL` in `backend/.env`. `HF_TOKEN` is optional (Hugging Face rate limits). `OPENALEX_API_KEY` is optional. `DO_OCR` defaults to `false`; set it to `true` to OCR scanned / image-only PDFs on ingest (slower).
 
 ```bash
 cd backend
@@ -107,7 +108,6 @@ That keeps the `thesys-data` volume. `docker compose down -v` deletes it.
 ## Later
 
 - [ ] Optional Cohere embeddings and reranker for users who want higher retrieval quality. Local BGE stays the default.
-- [ ] OCR for scanned PDFs so image-only pages can be searched and highlighted like born-digital papers.
 - [ ] Per-chat settings: saved title, selected model, and reasoning effort.
 
 ## License
