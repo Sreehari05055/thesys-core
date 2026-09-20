@@ -67,9 +67,13 @@ function mergeExternalPapers(
 }
 
 function externalPapersFromRecord(record: Record<string, unknown>): ExternalPaper[] {
-  return Array.isArray(record.external_papers)
-    ? normalizeExternalPapers(record.external_papers)
-    : [];
+  if (Array.isArray(record.external_papers)) {
+    return normalizeExternalPapers(record.external_papers);
+  }
+  if (Array.isArray(record.papers)) {
+    return normalizeExternalPapers(record.papers);
+  }
+  return [];
 }
 
 function botMessageFields(
