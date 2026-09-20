@@ -46,6 +46,10 @@ export function ExternalPaperPanel({
           <p className="mt-1.5 text-[12px] text-muted-foreground">{meta}</p>
         )}
 
+        <p className="mt-1.5 text-[12px] text-muted-foreground">
+          {paper.cited_by_count === 1 ? "1 citation" : `${paper.cited_by_count ?? 0} citations`}
+        </p>
+
         {paper.doi && (
           <p className="mt-2 text-[11px] text-muted-foreground/80">
             DOI: <span className="font-mono text-foreground/70">{paper.doi}</span>
