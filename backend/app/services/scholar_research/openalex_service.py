@@ -3,7 +3,6 @@ import httpx
 from app import logger
 from app.core.config import config
 from app.services.scholar_research.base_research import BaseResearchService
-from app.utils.pdf_url_verifier import attach_pdf_verification
 
 
 class OpenAlexResearchService(BaseResearchService):
@@ -156,6 +155,7 @@ class OpenAlexResearchService(BaseResearchService):
                 if paper_arxiv_id:
                     break
 
+            raw_cites = item.get("cited_by_count")
             formatted_results.append({
                 "id": paper_arxiv_id or paper_doi,
                 "arxiv_id": paper_arxiv_id,
@@ -165,12 +165,9 @@ class OpenAlexResearchService(BaseResearchService):
                 "doi": paper_doi,
                 "abstract": abstract,
                 "is_open_access": item.get("open_access", {}).get("is_oa"),
+                "cited_by_count": int(raw_cites) if isinstance(raw_cites, (int, float)) else None,
                 "pdf_url": pdf_url,
                 "landing_page_url": landing_page_url,
             })
 
-        formatted_results = await attach_pdf_verification(
-            formatted_results,
-            http_client=self.http_client,
-        )
         return formatted_results
