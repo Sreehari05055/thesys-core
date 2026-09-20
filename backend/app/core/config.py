@@ -78,6 +78,7 @@ class Config:
         # Conversation settings
         MAX_CONVERSATION_TURNS = admin.max_conversation_turns
         HTTP_TIMEOUT = float(os.getenv("HTTP_TIMEOUT", 30.0))  # seconds
+        DO_OCR = os.getenv("DO_OCR", "false").strip().lower() == "true"
     except Exception as e:
         logger.error(f"Error in configuration: {e}")
         raise RuntimeError(f"Error in configuration: {e}") from e
