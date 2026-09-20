@@ -7,6 +7,7 @@ export type ExternalPaper = {
   publication_year: number | null;
   doi: string;
   abstract: string;
+  cited_by_count: number | null;
   pdf_verified: boolean;
   pdf_url: string | null;
   landing_page_url: string;
@@ -27,6 +28,16 @@ function pickOptionalYear(record: Record<string, unknown>): number | null {
   return null;
 }
 
+function pickOptionalCount(record: Record<string, unknown>, key: string): number | null {
+  const v = record[key];
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) return Math.trunc(v);
+  if (typeof v === "string" && v.trim()) {
+    const n = Number.parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+  return null;
+}
+
 /** Normalize chat SSE ``external_papers`` payload. */
 export function normalizeExternalPapers(raw: unknown): ExternalPaper[] {
   if (!Array.isArray(raw)) return [];
@@ -38,8 +49,7 @@ export function normalizeExternalPapers(raw: unknown): ExternalPaper[] {
     const id = pickString(record, ["id"]);
     if (!id) continue;
 
-    const pdf_verified = Boolean(record.pdf_verified);
-    const pdf_url = pdf_verified ? pickOptionalString(record, "pdf_url") || null : null;
+    const pdf_url = pickOptionalString(record, "pdf_url") || null;
 
     out.push({
       id,
@@ -48,7 +58,8 @@ export function normalizeExternalPapers(raw: unknown): ExternalPaper[] {
       publication_year: pickOptionalYear(record),
       doi: pickOptionalString(record, "doi"),
       abstract: pickOptionalString(record, "abstract"),
-      pdf_verified,
+      cited_by_count: pickOptionalCount(record, "cited_by_count"),
+      pdf_verified: Boolean(pdf_url),
       pdf_url,
       landing_page_url: pickOptionalString(record, "landing_page_url"),
     });
@@ -57,21 +68,17 @@ export function normalizeExternalPapers(raw: unknown): ExternalPaper[] {
   return out;
 }
 
-/** Verified PDF links the LLM may emit in discover answers. */
-export function verifiedPdfUrls(papers: ExternalPaper[]): string[] {
-  return papers
-    .filter((p) => p.pdf_verified && p.pdf_url)
-    .map((p) => p.pdf_url!);
-}
-
-export function externalPaperByPdfUrl(
+export function paperByUrl(
   papers: ExternalPaper[],
   url: string,
 ): ExternalPaper | undefined {
   const normalized = normalizeUrlForMatch(url);
-  return papers.find(
-    (p) => p.pdf_verified && p.pdf_url && normalizeUrlForMatch(p.pdf_url) === normalized,
-  );
+  if (!normalized) return undefined;
+  return papers.find((p) => {
+    const pdf = p.pdf_url ? normalizeUrlForMatch(p.pdf_url) : "";
+    const landing = p.landing_page_url ? normalizeUrlForMatch(p.landing_page_url) : "";
+    return pdf === normalized || landing === normalized;
+  });
 }
 
 export function primaryExternalLink(paper: ExternalPaper): string {
