@@ -49,12 +49,13 @@ def _build_converter() -> DocumentConverter:
         num_threads=max(1, os.cpu_count() or 4),
     )
     opts = PdfPipelineOptions(
-        do_ocr=True,
+        do_ocr=config.DO_OCR,
         do_table_structure=True,
         generate_parsed_pages=True,
         accelerator_options=accel,
-        ocr_options=RapidOcrOptions(backend="onnxruntime", lang=["english"]),
     )
+    if config.DO_OCR:
+        opts.ocr_options = RapidOcrOptions(backend="onnxruntime", lang=["english"])
     opts.table_structure_options.mode = TableFormerMode.ACCURATE
     opts.do_picture_description = True
     opts.enable_remote_services = True
