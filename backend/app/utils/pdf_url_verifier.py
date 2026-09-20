@@ -1,8 +1,6 @@
 """Verify remote URLs by downloading the full PDF (%PDF- magic bytes)."""
 from __future__ import annotations
-import asyncio
 import ipaddress
-from collections import Counter
 from urllib.parse import urlparse
 import httpx
 from app import logger
@@ -10,7 +8,6 @@ from app.core.config import config
 
 PDF_MAGIC = b"%PDF"
 DEFAULT_USER_AGENT = "ResearchApp/1.0"
-VERIFY_REASON_KEY = "pdf_verify_reason"
 
 
 def url_is_safe_for_fetch(url: str) -> bool:
@@ -68,7 +65,9 @@ async def _download_full_body(
         return b"".join(chunks), final, resp.status_code, ctype, None
 
     if http_client is not None:
-        async with http_client.stream("GET", url, headers=headers, timeout=timeout) as resp:
+        async with http_client.stream(
+            "GET", url, headers=headers, timeout=timeout, follow_redirects=True
+        ) as resp:
             return await _read_stream(resp)
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -143,106 +142,3 @@ async def download_pdf_from_url(
     except Exception as e:
         logger.warning("PDF verify: %s — %s: %s", type(e).__name__, url[:120], e)
         return None, None, None, f"error:{type(e).__name__}"
-
-
-async def verify_pdf_url(
-    url: str,
-    *,
-    http_client=None,
-    timeout: float | None = None,
-) -> tuple[bool, str | None, str]:
-    """Download the full file; return (verified, final_url_after_redirects, reason)."""
-    body, final_url, _content_type, reason = await download_pdf_from_url(
-        url,
-        http_client=http_client,
-        timeout=timeout,
-    )
-    if reason == "verified" and body:
-        return True, final_url, reason
-    return False, final_url, reason
-
-
-def _log_verification_summary(rows: list[dict]) -> None:
-    reasons = Counter(r.get(VERIFY_REASON_KEY, "unknown") for r in rows)
-    verified = reasons.get("verified", 0)
-    logger.info(
-        "PDF verification summary: %d/%d verified — breakdown %s",
-        verified,
-        len(rows),
-        dict(reasons),
-    )
-
-
-async def attach_pdf_verification(
-    rows: list[dict],
-    *,
-    url_key: str = "pdf_url",
-    verified_key: str = "pdf_verified",
-    http_client=None,
-) -> list[dict]:
-    """Set ``verified_key`` on each row; update ``url_key`` to the final URL when verified."""
-    urls = [r.get(url_key) for r in rows if r.get(url_key)]
-    if not urls:
-        for row in rows:
-            row[verified_key] = False
-            row[VERIFY_REASON_KEY] = "no_pdf_url_from_openalex"
-            work_id = row.get("id", "?")
-            title = (row.get("title") or "Untitled")[:80]
-            logger.info(
-                "PDF verify [%s] %r: no_pdf_url_from_openalex (landing=%s)",
-                work_id,
-                title,
-                (row.get("landing_page_url") or "none")[:100],
-            )
-        _log_verification_summary(rows)
-        return rows
-
-    results = await asyncio.gather(
-        *[verify_pdf_url(u, http_client=http_client) for u in urls],
-        return_exceptions=True,
-    )
-    by_url: dict[str, tuple[bool, str | None, str]] = {}
-    for url, result in zip(urls, results):
-        if isinstance(result, Exception):
-            logger.warning("PDF verification error for %s: %s", url[:120], result)
-            by_url[url] = (False, None, f"error:{type(result).__name__}")
-        else:
-            by_url[url] = result
-
-    for row in rows:
-        work_id = row.get("id", "?")
-        title = (row.get("title") or "Untitled")[:80]
-        raw_url = row.get(url_key)
-        if not raw_url:
-            row[verified_key] = False
-            row[VERIFY_REASON_KEY] = "no_pdf_url_from_openalex"
-            logger.info(
-                "PDF verify [%s] %r: no_pdf_url_from_openalex (landing=%s)",
-                work_id,
-                title,
-                (row.get("landing_page_url") or "none")[:100],
-            )
-            continue
-
-        verified, final_url, reason = by_url.get(raw_url, (False, None, "unknown"))
-        row[verified_key] = verified
-        row[VERIFY_REASON_KEY] = reason
-        if verified and final_url:
-            row[url_key] = final_url
-            logger.info(
-                "PDF verify [%s] %r: verified — %s",
-                work_id,
-                title,
-                final_url[:120],
-            )
-        else:
-            logger.info(
-                "PDF verify [%s] %r: NOT verified (%s) — %s",
-                work_id,
-                title,
-                reason,
-                raw_url[:120],
-            )
-
-    _log_verification_summary(rows)
-    return rows
