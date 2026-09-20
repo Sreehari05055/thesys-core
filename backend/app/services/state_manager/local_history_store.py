@@ -175,7 +175,7 @@ class LocalHistoryStore(BaseHistoryStore):
         papers_by_msg: dict[str, list] = {}
         for paper in self._conn.execute(
             "SELECT message_id, paper_id, title, authors, publication_year, doi, abstract, "
-            "is_open_access, pdf_verified, pdf_url, landing_page_url, rerank_score "
+            "is_open_access, pdf_verified, pdf_url, landing_page_url, cited_by_count, rerank_score "
             "FROM external_papers WHERE chat_id = ?",
             (session_id,),
         ):
@@ -187,10 +187,11 @@ class LocalHistoryStore(BaseHistoryStore):
                 "doi": paper["doi"],
                 "abstract": paper["abstract"],
                 "is_open_access": bool(paper["is_open_access"]),
-                "pdf_verified": bool(paper["pdf_verified"]),
-                "pdf_url": paper["pdf_url"] if paper["pdf_verified"] else None,
+                "pdf_url": paper["pdf_url"],
                 "landing_page_url": paper["landing_page_url"],
             }
+            if paper["cited_by_count"] is not None:
+                item["cited_by_count"] = paper["cited_by_count"]
             if paper["rerank_score"] is not None:
                 item["rerank_score"] = paper["rerank_score"]
             papers_by_msg.setdefault(paper["message_id"], []).append(item)
@@ -260,11 +261,10 @@ class LocalHistoryStore(BaseHistoryStore):
                 ),
             )
         for paper in papers or ():
-            verified = 1 if paper.get("pdf_verified") else 0
             self._conn.execute(
                 "INSERT INTO external_papers (id, message_id, chat_id, paper_id, title, authors, "
                 "publication_year, doi, abstract, is_open_access, pdf_verified, pdf_url, "
-                "landing_page_url, rerank_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "landing_page_url, cited_by_count, rerank_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(uuid.uuid4()),
                     mid,
@@ -276,9 +276,10 @@ class LocalHistoryStore(BaseHistoryStore):
                     paper.get("doi"),
                     paper.get("abstract"),
                     1 if paper.get("is_open_access") else 0,
-                    verified,
-                    paper.get("pdf_url") if verified else None,
+                    0,
+                    paper.get("pdf_url"),
                     paper.get("landing_page_url"),
+                    paper.get("cited_by_count"),
                     paper.get("rerank_score"),
                 ),
             )
@@ -314,7 +315,7 @@ class LocalHistoryStore(BaseHistoryStore):
     def _get_verified_external_pdf_url(self, session_id, paper_id, url):
         row = self._conn.execute(
             "SELECT pdf_url FROM external_papers "
-            "WHERE chat_id = ? AND paper_id = ? AND pdf_verified = 1 AND pdf_url = ?",
+            "WHERE chat_id = ? AND paper_id = ? AND pdf_url = ?",
             (session_id, paper_id, url),
         ).fetchone()
         return row["pdf_url"] if row else None
