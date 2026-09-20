@@ -2,7 +2,8 @@
 
 # Thesys
 
-[![GitHub stars](https://img.shields.io/github/stars/Sreehari05055/thesys-core?style=flat)](https://github.com/Sreehari05055/thesys-core/stargazers)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue?style=flat)](https://www.python.org/downloads/)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen?style=flat)](https://github.com/Sreehari05055/thesys-core/issues)
 [![License: AGPL-3.0](https://img.shields.io/github/license/Sreehari05055/thesys-core?style=flat)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/Sreehari05055/thesys-core?style=flat)](https://github.com/Sreehari05055/thesys-core/commits)
 [![Issues](https://img.shields.io/github/issues/Sreehari05055/thesys-core?style=flat)](https://github.com/Sreehari05055/thesys-core/issues)
