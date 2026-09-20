@@ -26,6 +26,9 @@ def _paper_dedup_keys(paper: dict) -> set[str]:
     for field in ("arxiv_id", "id", "pdf_url", "landing_page_url"):
         if arxiv := BaseResearchService.extract_arxiv_id(paper.get(field)):
             keys.add(f"arxiv:{arxiv}")
+    title = " ".join((paper.get("title") or "").lower().split())
+    if title:
+        keys.add(f"title:{title}")
     return keys
 
 def deduplicate_papers(papers: list[dict]) -> list[dict]:
