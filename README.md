@@ -3,14 +3,22 @@
 # Thesys
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue?style=flat)](https://www.python.org/downloads/)
-[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen?style=flat)](https://github.com/Sreehari05055/thesys-core/issues)
 [![License: AGPL-3.0](https://img.shields.io/github/license/Sreehari05055/thesys-core?style=flat)](LICENSE)
-[![Last commit](https://img.shields.io/github/last-commit/Sreehari05055/thesys-core?style=flat)](https://github.com/Sreehari05055/thesys-core/commits)
 [![Issues](https://img.shields.io/github/issues/Sreehari05055/thesys-core?style=flat)](https://github.com/Sreehari05055/thesys-core/issues)
 
 </div>
 
 Local research workspace: search open-access papers (OpenAlex and arXiv), upload PDFs, ask questions with on-page highlights, and export citations.
+
+Papers, embeddings, and chat history stay on disk. Citations jump to the PDF. Chat needs an OpenAI API key; ingest and retrieval run locally (Docling, Chroma, BGE).
+
+Copy `backend/.env.example` to `backend/.env`, set `OPENAI_API_KEY` and `EMAIL`, then:
+
+```bash
+docker compose up --build
+```
+
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). First build is large; first ingest downloads Hugging Face weights inside the container. `docker compose down` keeps the `thesys-data` volume (papers and chat). `docker compose down -v` deletes it.
 
 ![Full on-PDF highlights from a cited passage](screenshots/full_highlights.png)
 
@@ -54,12 +62,9 @@ Local research workspace: search open-access papers (OpenAlex and arXiv), upload
 
 PDFs, vectors, and chat history stay on disk under `backend/data/`. First ingest downloads embedding/rerank weights (Hugging Face). GPU helps; CPU works and is slower.
 
-## Requirements
+## Local setup
 
-- Python 3.11+ and Node.js 20+ (local run), **or** Docker
-- An OpenAI API key
-
-## Setup
+Needs Python 3.11+, Node.js 20+, and an OpenAI API key (or use Docker above).
 
 ```bash
 python -m venv .venv
@@ -88,24 +93,6 @@ npm run dev
 
 Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The UI talks to `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`).
 
-## Docker
-
-Copy `backend/.env.example` to `backend/.env` and set `OPENAI_API_KEY` and `EMAIL`. Then:
-
-```bash
-docker compose up --build
-```
-
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000). First build is large (CPU PyTorch, Docling). First ingest still downloads Hugging Face weights inside the container.
-
-Stop without deleting papers or chat history:
-
-```bash
-docker compose down
-```
-
-That keeps the `thesys-data` volume. `docker compose down -v` deletes it.
-
 ## Later
 
 - [ ] Optional Cohere embeddings and reranker for users who want higher retrieval quality. Local BGE stays the default.
@@ -113,4 +100,4 @@ That keeps the `thesys-data` volume. `docker compose down -v` deletes it.
 
 ## License
 
-[AGPL-3.0](LICENSE)
+[AGPL-3.0](LICENSE). Maintained by [Sreehari](https://github.com/Sreehari05055). [Issues](https://github.com/Sreehari05055/thesys-core/issues) and pull requests are welcome; start from an issue if the change is large.
