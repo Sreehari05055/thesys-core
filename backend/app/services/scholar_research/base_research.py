@@ -74,7 +74,6 @@ class BaseResearchService:
     @staticmethod
     def paper_to_frontend(row: dict) -> dict:
         """Shape one paper for the chat SSE ``external_papers`` payload."""
-        verified = bool(row.get("pdf_verified"))
         payload = {
             "id": row.get("id"),
             "title": row.get("title"),
@@ -83,10 +82,11 @@ class BaseResearchService:
             "doi": row.get("doi"),
             "abstract": row.get("abstract"),
             "is_open_access": row.get("is_open_access"),
-            "pdf_verified": verified,
-            "pdf_url": row.get("pdf_url") if verified else None,
+            "pdf_url": row.get("pdf_url"),
             "landing_page_url": row.get("landing_page_url"),
         }
+        if row.get("cited_by_count") is not None:
+            payload["cited_by_count"] = int(row["cited_by_count"])
         if row.get("rerank_score") is not None:
             payload["rerank_score"] = row["rerank_score"]
         return payload
