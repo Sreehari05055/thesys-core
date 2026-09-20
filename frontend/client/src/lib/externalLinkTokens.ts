@@ -1,11 +1,7 @@
-import {
-  externalPaperByPdfUrl,
-  type ExternalPaper,
-  verifiedPdfUrls,
-} from "@/lib/externalPaper";
+import { paperByUrl, type ExternalPaper } from "@/lib/externalPaper";
 
-const URL_IN_TEXT =
-  /https?:\/\/[^\s<>\[\]"')]+/gi;
+const URL_IN_TEXT = /https?:\/\/[^\s<>\[\]"')]+/gi;
+const MD_LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
 
 function escapeHtmlAttr(value: string): string {
   return value
@@ -25,21 +21,21 @@ function externalLinkHtml(paper: ExternalPaper): string {
     `</svg></cite>`;
 }
 
-/**
- * Replace verified PDF URLs in discover answers with compact external-link chips.
- * Only URLs present in ``externalPapers`` with ``pdf_verified`` are transformed.
- */
+/** Turn discover paper URLs into chips that open the right-hand paper panel. */
 export function applyExternalLinkTokens(
   markdown: string,
   externalPapers: ExternalPaper[] | undefined,
   discoverMode: boolean,
 ): string {
-  if (!discoverMode || !externalPapers?.length || !verifiedPdfUrls(externalPapers).length) {
-    return markdown;
-  }
+  if (!discoverMode || !externalPapers?.length) return markdown;
 
-  return markdown.replace(URL_IN_TEXT, (match) => {
-    const paper = externalPaperByPdfUrl(externalPapers, match);
+  const withMd = markdown.replace(MD_LINK, (full, _text, href: string) => {
+    const paper = paperByUrl(externalPapers, href);
+    return paper ? externalLinkHtml(paper) : full;
+  });
+
+  return withMd.replace(URL_IN_TEXT, (match) => {
+    const paper = paperByUrl(externalPapers, match);
     return paper ? externalLinkHtml(paper) : match;
   });
 }
