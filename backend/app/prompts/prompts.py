@@ -331,11 +331,16 @@ def get_corpus_system_prompt() -> str:
 
     Do not retrieve information when the answer can be provided accurately without document evidence.
 
+    Put coverage into SearchResearch.topic: several distinct facet queries in one call
+    (claim, method, limitations, contrary or related-work framing).
+
     Perform retrieval iteratively.
 
     Continue retrieving information until you have sufficient evidence to answer accurately or determine that additional retrieval is unlikely to improve the answer.
 
     Prefer complete understanding over minimizing retrieval calls.
+
+    Call SearchResearch again only if a needed facet is still missing.
 
     Avoid redundant retrieval once enough evidence has been collected.
 

@@ -4,30 +4,29 @@ from app.core.config import config
 
 class SearchResearch(BaseModel):
     """
-    Use when user wants to find or learn about a specific topic 
-    from their uploaded papers. Single intent, single topic.
-    
+    Search uploaded papers for document evidence.
+
     Examples:
     - "what does this paper say about dropout"
     - "find sections about data augmentation"
     - "explain the methodology in paper X"
     """
 
-    topic: List[str] = Field(description=(        
-        "Semantically rewritten search queries derived from the user question. "
-        "Each item should be a full natural-language query optimized for vector retrieval, "
-        "DO NOT return single words or keyword lists."))
+    topic: List[str] = Field(description=(
+        "Full natural-language retrieval queries, not keywords. "
+        "Emit distinct facet queries in one call covering the aspects needed "
+        "to answer — e.g. the claim, method/measurement, limitations or caveats, "
+        "and contrary or related-work framing. "
+        "Do not emit near-synonyms of the same sentence."))
     question: str = Field(description=(        
         "A minimally normalized version of the original question "
         "(e.g., resolving pronouns), without changing scope or intent."))
     top_n: Optional[int] = Field(
         default=None,
-        ge=1,
+        ge=2,
         le=config.TOP_N,
         description=(
-            f"Number of document chunks to return after reranking (1-{config.TOP_N}). "
-            "Use 2-3 for narrow factual lookups, 4-5 for explanations, "
-            f"{config.TOP_N} only when the question spans multiple sections or documents. "
+            f"Chunks to keep after reranking (2-{config.TOP_N}). "
             f"Omit to retrieve up to {config.TOP_N} chunks."
         ),
     )
