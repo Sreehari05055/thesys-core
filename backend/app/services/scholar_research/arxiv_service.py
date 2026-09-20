@@ -4,7 +4,6 @@ import httpx
 
 from app import logger
 from app.services.scholar_research.base_research import BaseResearchService
-from app.utils.pdf_url_verifier import attach_pdf_verification
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
 ATOM = f"{{{ATOM_NS}}}"
@@ -130,8 +129,4 @@ class ArxivResearchService(BaseResearchService):
             return f"Error fetching research from arXiv: {response.status_code}"
 
         formatted_results = self._parse_feed(response.text)
-        formatted_results = await attach_pdf_verification(
-            formatted_results,
-            http_client=self.http_client,
-        )
         return formatted_results
