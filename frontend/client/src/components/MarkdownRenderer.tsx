@@ -129,12 +129,11 @@ export function MarkdownRenderer({
       if (!external) return;
 
       const paperHandler = onExternalPaperClickRef.current;
-      if (!paperHandler) return;
-
       const paperId = external.dataset.paperId;
-      const paper = externalPapersRef.current?.find((p) => p.id === paperId);
-      if (!paper) return;
-
+      const paper = paperId
+        ? externalPapersRef.current?.find((p) => p.id === paperId)
+        : undefined;
+      if (!paperHandler || !paper) return;
       event.preventDefault();
       event.stopPropagation();
       paperHandler(paper);
