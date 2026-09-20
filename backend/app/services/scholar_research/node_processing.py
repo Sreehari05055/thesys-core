@@ -36,7 +36,14 @@ def deduplicate_papers(papers: list[dict]) -> list[dict]:
     out = []
     for paper in papers:
         keys = _paper_dedup_keys(paper)
-        if keys and keys & seen:
+        if keys & seen:
+            for kept in out:
+                if _paper_dedup_keys(kept) & keys:
+                    if kept.get("cited_by_count") is None and paper.get("cited_by_count") is not None:
+                        kept["cited_by_count"] = paper["cited_by_count"]
+                    if not kept.get("pdf_url") and paper.get("pdf_url"):
+                        kept["pdf_url"] = paper["pdf_url"]
+                    break
             continue
         seen.update(keys)
         out.append(paper)
