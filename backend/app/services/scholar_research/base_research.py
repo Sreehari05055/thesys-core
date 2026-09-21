@@ -61,6 +61,7 @@ class BaseResearchService:
             f"Authors: {row.get('authors', '')}",
             f"Year: {row.get('publication_year', '')}",
             f"DOI: {row.get('doi', '')}",
+            f"Cited by count: {row.get('cited_by_count', '')}",
         ]
         if row.get("abstract"):
             lines.append(f"Abstract: {row['abstract']}")
