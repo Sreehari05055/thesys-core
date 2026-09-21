@@ -52,6 +52,7 @@ class ToolExecutor:
             authors=args.get("authors"),
             pmid=args.get("pmid"),
             arxiv_id=args.get("arxiv_id"),
+            cited_by_count=args.get("cited_by_count"),
             count=args.get("count") or 10,
             publication_year=args.get("publication_year"),
             is_oa=args.get("is_oa"),
