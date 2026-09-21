@@ -81,6 +81,13 @@ class FetchResearch(BaseModel):
         default=None,
         description="arXiv ID for specific paper lookup (e.g., '2301.12345' or '2301.12345v2')."
     )
+    cited_by_count: Optional[str] = Field(
+        default=None,
+        description=(
+            "Omit unless the user asks. "
+            "Same syntax as publication_year: '100' (exact), '>50', '<10', or '50-200'. "
+        ),
+    )
     count: int = Field(default=10, description="The number of research papers to return. Default is 10.")
     publication_year: Optional[str] = Field(
         default=">1950",
