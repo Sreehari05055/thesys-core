@@ -19,6 +19,7 @@ class OpenAlexResearchService(BaseResearchService):
         authors=None,
         pmid=None,
         arxiv_id=None,
+        cited_by_count=None,
         count=10,
         publication_year=None,
         is_oa=True,
@@ -81,7 +82,12 @@ class OpenAlexResearchService(BaseResearchService):
                 f"is_oa:{str(is_oa).lower() if is_oa is not None else 'true'}",
                 "has_abstract:true",
             ]
-            
+            if cited_by_count not in (None, "", False):
+                cites = str(cited_by_count).strip().replace(" ", "")
+                if re.fullmatch(r"[<>]?\d+(?:-\d+)?", cites):
+                    filter_parts.append(f"cited_by_count:{cites}")
+                else:
+                    logger.warning("Ignoring invalid cited_by_count filter: %s", cited_by_count)
             if has_pdf is not None:
                 filter_parts.append(f"has_pdf_url:{str(has_pdf).lower()}")
             

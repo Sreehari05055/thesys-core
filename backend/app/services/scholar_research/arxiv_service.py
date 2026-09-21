@@ -97,6 +97,7 @@ class ArxivResearchService(BaseResearchService):
         title=None,
         authors=None,
         pmid=None,
+        cited_by_count=None, 
         count=10,
         publication_year=None,
         is_oa=True,
