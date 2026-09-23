@@ -24,6 +24,7 @@ class RAGConfig:
     parent_chunk_size: int = 448
     top_k: int = 20
     top_n: int = 8
+    compare_top_n: int = 4
     max_pdf_pages: int = 40
 
 
@@ -48,6 +49,7 @@ admin = AdminConfig(
         parent_chunk_size=448,
         top_k=10,
         top_n=8,
+        compare_top_n=4,
         max_pdf_pages=150,
     ),
     max_conversation_turns=10
@@ -73,6 +75,7 @@ class Config:
         PARENT_CHUNK_SIZE = admin.rag.parent_chunk_size
         TOP_K = admin.rag.top_k
         TOP_N = admin.rag.top_n
+        COMPARE_TOP_N = admin.rag.compare_top_n
 
         USE_GPU_ACCELERATION = HardwareDetector.should_use_acceleration()
         
