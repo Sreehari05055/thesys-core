@@ -10,6 +10,7 @@ import { ChatMessageList } from "./ChatMessageList";
 import { PendingSourceChips } from "./PendingSourceChips";
 import { ChatRightPanel } from "./ChatRightPanel";
 import { ResearchScopePicker } from "./ResearchScopePicker";
+import { CompareModeToggle } from "./CompareModeToggle";
 import { MyLibraryPanel } from "./MyLibraryPanel";
 
 type ChatMainPanelProps = {
@@ -74,6 +75,9 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
     canSend,
     researchScope,
     setResearchScope,
+    canCompare,
+    compareMode,
+    setCompareMode,
     sidebarView,
   } = model;
 
@@ -256,11 +260,18 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
                       onSend={handleSend}
                       loading={loading}
                       canSend={canSend}
-                      composerClassName={discoverMode ? "rag-composer-bar--discover" : undefined}
+                      composerClassName={
+                        discoverMode
+                          ? "rag-composer-bar--discover"
+                          : compareMode
+                            ? "rag-composer-bar--compare"
+                            : undefined
+                      }
                       placeholder={researchScopePlaceholder(researchScope, {
                         pendingCitations: pendingSourceRefs.length,
                         selectedDocCount: selectedChatDocs.length,
                         singleDocName: selectedChatDocs[0]?.filename,
+                        compareMode,
                       })}
                       lead={
                         !discoverMode ? (
@@ -284,11 +295,20 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
                         ) : undefined
                       }
                       insetFooter={
-                        <ResearchScopePicker
-                          scope={researchScope}
-                          onScopeChange={setResearchScope}
-                          disabled={loading}
-                        />
+                        <>
+                          <ResearchScopePicker
+                            scope={researchScope}
+                            onScopeChange={setResearchScope}
+                            disabled={loading}
+                          />
+                          {canCompare ? (
+                            <CompareModeToggle
+                              on={compareMode}
+                              onToggle={setCompareMode}
+                              disabled={loading}
+                            />
+                          ) : null}
+                        </>
                       }
                     />
                   </div>
