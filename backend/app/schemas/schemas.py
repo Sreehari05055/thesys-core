@@ -9,6 +9,7 @@ class ActiveDocument(BaseModel):
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, description="User message; token limit enforced in POST /api/chat.")
     research_mode: bool = False
+    compare_mode: bool = False
     source_ids: list[str] = Field(default_factory=list)
     active_documents: list[ActiveDocument] = Field(
         default_factory=list,
