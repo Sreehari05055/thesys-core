@@ -11,7 +11,8 @@ class ToolExecutor:
         try:
             dispatch_map = {
                 "SearchResearch": self._execute_search_research,
-                "FetchResearch": self._fetch_research,
+                "FetchResearch": self._execute_fetch_research,
+                "CompareResearch": self._execute_compare_research,
             }
             args = json.loads(args_str) if args_str.strip() else {}
             ctx = {
@@ -22,19 +23,13 @@ class ToolExecutor:
             
             logger.info("Executing tool: %s", function_name)
             return await dispatch_map[function_name](args, ctx)
-        except Exception as e:
-            logger.error("Tool failure [%s]: %s", function_name, e, exc_info=True)
-            return f"Error executing {function_name}: {str(e)}"
+        except Exception:
+            logger.error("Tool failure [%s]", function_name, exc_info=True)
+            raise
 
     async def _execute_search_research(self, args, ctx):
         session_id = ctx.get("session_id")
         search_params = dict(ctx.get("search_params") or {})
-        if search_params.get("research_mode"):
-            return (
-                "SearchResearch is unavailable while external research mode is enabled. "
-                "Use FetchResearch for OpenAlex literature, or ask the user to disable "
-                "research mode to search uploaded documents."
-            )
         args.get("top_n") is not None and search_params.update(top_n=args["top_n"])
         return await self.rag_service.get_info(
             queries=args.get("topic"),
@@ -43,7 +38,7 @@ class ToolExecutor:
             search_params=search_params,
         )
 
-    async def _fetch_research(self, args, ctx):
+    async def _execute_fetch_research(self, args, ctx):
         """Fetch academic papers via ScholarExecutionService; returns papers + context_text dict."""
         payload = await self.scholar_service.fetch_research(
             query=args.get("query") or "",
@@ -60,3 +55,14 @@ class ToolExecutor:
         )
         logger.info("FetchResearch returned %d paper(s)", len(payload.get("papers") or []))
         return payload
+
+    async def _execute_compare_research(self, args, ctx):
+        """Compare exactly two uploaded papers on one claim or question."""
+        session_id = ctx.get("session_id")
+        search_params = dict(ctx.get("search_params") or {})
+        return await self.rag_service.compare_research(
+            queries=args.get("topic"),
+            user_query=args.get("question"),
+            session_id=session_id,
+            search_params=search_params,
+        )
