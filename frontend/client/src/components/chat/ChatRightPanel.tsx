@@ -5,11 +5,112 @@ import { PDFViewer } from "@/components/PDFViewer";
 import { SummariesLogTab } from "@/components/SummariesLogTab";
 import type { ChatPageModel } from "@/hooks/useChatPage";
 import { cn } from "@/lib/utils";
+import type { CompareRelation, Source } from "@/lib/chatMessages";
 
 type ChatRightPanelProps = {
   model: ChatPageModel;
   intelPanelRef: RefObject<ImperativePanelHandle | null>;
 };
+
+function ConfidenceRing({ confidence }: { confidence: number }) {
+  const pct = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
+  const r = 8;
+  const circ = 2 * Math.PI * r;
+  return (
+    <span className="flex shrink-0 items-center gap-1" title={`${pct}%`}>
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 22 22"
+      className="block"
+      aria-hidden
+    >
+      <circle
+        cx="11"
+        cy="11"
+        r={r}
+        fill="none"
+        className="stroke-muted-foreground/25"
+        strokeWidth="2"
+      />
+      <circle
+        cx="11"
+        cy="11"
+        r={r}
+        fill="none"
+        className="stroke-primary/70"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={circ * (1 - pct / 100)}
+        transform="rotate(-90 11 11)"
+      />
+    </svg>
+    <span className="text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
+    </span>
+  );
+}
+
+function CompareRelationCard({
+  index,
+  relation,
+  getDocDisplayName,
+  onOpenChunk,
+  onAskPair,
+}: {
+  index: number;
+  relation: CompareRelation;
+  getDocDisplayName: (src: Source) => string;
+  onOpenChunk: (src: Source) => void;
+  onAskPair: (relation: CompareRelation) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-secondary overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+        <div className="h-7 w-7 rounded-md bg-primary/12 flex items-center justify-center text-primary font-bold text-[11px] shrink-0">
+          {index}
+        </div>
+        <div className="min-w-0 flex-1 flex items-center gap-1.5">
+          <div className="min-w-0 truncate text-[13px] font-semibold text-foreground capitalize">
+            {relation.choice || "relation"}
+          </div>
+          <ConfidenceRing confidence={relation.confidence} />
+        </div>
+        <button
+          type="button"
+          title="Ask about this pair"
+          onClick={() => onAskPair(relation)}
+          className="flex shrink-0 items-center gap-1 px-2 py-1 rounded-md bg-primary/12 hover:bg-primary/22 text-primary text-[11px] font-medium transition-colors"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+          Ask
+        </button>
+      </div>
+      {([relation.chunk_a, relation.chunk_b] as const).map((chunk) => (
+        <button
+          key={chunk.id}
+          type="button"
+          className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-t border-border"
+          onClick={() => onOpenChunk(chunk)}
+        >
+          <div className="text-[13px] font-semibold text-foreground truncate">
+            {getDocDisplayName(chunk)}
+          </div>
+          <div className="text-[10px] text-muted-foreground">
+            {chunk.pages?.length
+              ? chunk.pages.length > 1
+                ? `Pages ${chunk.pages.join(", ")}`
+                : `Page ${chunk.pages[0]}`
+              : "No page info"}
+          </div>
+          <div className="mt-1 text-[12px] text-muted-foreground line-clamp-2 leading-relaxed">
+            {chunk.content}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function SourceHighlightModeToggle({
   precise,
@@ -87,12 +188,16 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
     globalSourceNumberById,
     usePreciseSourceHighlight,
     setUsePreciseSourceHighlight,
+    compareMode,
+    compareRelations,
   } = model;
 
   const panelHidden = !showRightPanel;
   const viewingSummary = leftPanelMode === "summary";
   const showExternalPaper = activeExternalPaper != null && !viewingSummary;
   const sidebarSources = viewingSummary ? (documentSummary?.sources ?? []) : panelSources;
+  const showCompareList = !viewingSummary && (compareRelations.length > 0 || compareMode);
+  const listCount = showCompareList ? compareRelations.length : sidebarSources.length;
   const pdfPreview = showPDF && activeSource != null && !showExternalPaper;
   const activePreviewBboxes = usePreciseSourceHighlight
     ? activeSource?.precise_bboxes
@@ -183,12 +288,35 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
           <div className="flex-1 overflow-hidden relative flex flex-col min-h-0">
             {rightPanelTab === "sources" && (
               <>
-                {!showPDF && sidebarSources.length > 0 ? (
+                {!showPDF && listCount > 0 ? (
                   <div className="flex-1 overflow-y-auto p-3 space-y-2 rag-scrollbar">
                     <div className="sidebar-section-label py-2 px-1">
-                      {viewingSummary ? "Summary Sources" : "Document Sources"}
+                      {viewingSummary
+                        ? "Summary Sources"
+                        : showCompareList
+                          ? "Compared pairs"
+                          : "Document Sources"}
                     </div>
-                    {sidebarSources.map((src, index) => {
+                    {showCompareList
+                      ? compareRelations.map((relation, index) => (
+                          <CompareRelationCard
+                            key={`${relation.chunk_a.id}-${relation.chunk_b.id}-${index}`}
+                            index={index + 1}
+                            relation={relation}
+                            getDocDisplayName={getDocDisplayName}
+                            onOpenChunk={(src) =>
+                              selectSourceForPreview(src, {
+                                showPdf: true,
+                                preciseHighlight: true,
+                              })
+                            }
+                            onAskPair={(rel) => {
+                              attachSourceForChat(rel.chunk_a);
+                              attachSourceForChat(rel.chunk_b);
+                            }}
+                          />
+                        ))
+                      : sidebarSources.map((src, index) => {
                               const currentId = globalSourceNumberById.get(src.id) ?? index + 1;
                               return (
                                 <div key={src.id || `source-${currentId}`} className="group rounded-lg border border-border bg-secondary overflow-hidden transition-colors hover:bg-accent hover:border-border">
@@ -348,7 +476,9 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
                     <div className="text-[12px] text-muted-foreground/60 mt-1 leading-relaxed">
                       {viewingSummary
                         ? "Click a citation in the summary to preview it here"
-                        : sidebarSources.length === 0
+                        : showCompareList && compareRelations.length === 0
+                          ? "Compared pairs will appear here after Compare runs"
+                          : sidebarSources.length === 0
                           ? "Cited sources will appear here as the assistant responds"
                           : "Click a citation in the chat to preview it here"}
                     </div>
