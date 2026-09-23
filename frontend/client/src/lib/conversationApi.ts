@@ -25,12 +25,15 @@ export function buildChatPostBody(
     sourceIds?: string[];
     activeDocuments?: ActiveDocument[];
     retrievalScope?: ResearchScope;
+    compareMode?: boolean;
   },
 ): string {
   const discover = options?.retrievalScope === "discover";
+  const compare = !discover && Boolean(options?.compareMode);
   return JSON.stringify({
     question,
     ...(discover ? { research_mode: true } : {}),
+    ...(compare ? { compare_mode: true } : {}),
     ...(!discover && options?.sourceIds?.length ? { source_ids: options.sourceIds } : {}),
     ...(!discover && options?.activeDocuments?.length
       ? { active_documents: options.activeDocuments }
@@ -63,8 +66,8 @@ function backfillBotSources(loaded: ChatMessage[], cached: ChatMessage[]): ChatM
     if (msg.sender !== "bot") return msg;
     const cachedMsg = cachedBot[botIdx++];
     const next = { ...msg };
-    if ((next.sources?.length ?? 0) === 0 && cachedMsg?.sources?.length) {
-      next.sources = cachedMsg.sources;
+    if ((next.compareRelations?.length ?? 0) === 0 && cachedMsg?.compareRelations?.length) {
+      next.compareRelations = cachedMsg.compareRelations;
     }
     if ((next.externalPapers?.length ?? 0) === 0 && cachedMsg?.externalPapers?.length) {
       next.externalPapers = cachedMsg.externalPapers;
