@@ -31,6 +31,30 @@ class SearchResearch(BaseModel):
         ),
     )
 
+class CompareResearch(BaseModel):
+    """
+    Compare exactly two uploaded papers on one claim or question.
+    The two documents are already selected in the session; do not pass filenames.
+
+    Use for agreement, conflict, or "does A contradict B on X".
+    Not for summarizing one paper or gathering evidence from both without relating them.
+
+    Examples:
+    - "do these papers disagree on acute caffeine and working memory"
+    - "does B corroborate A's dropout result"
+    """
+
+    topic: List[str] = Field(description=(
+        "Full natural-language retrieval queries, not keywords. "
+        "Emit distinct facet queries covering the claim to compare — "
+        "e.g. the finding, how it was measured, and caveats. "
+        "Do not emit near-synonyms of the same sentence."
+    ))
+    question: str = Field(description=(
+        "A minimally normalized version of the original compare question "
+        "(e.g., resolving pronouns), without changing scope or intent."
+    ))
+
 class FetchResearch(BaseModel):
     """
     OpenAlex keyword search API for finding research papers.
