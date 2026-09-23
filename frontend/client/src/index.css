@@ -136,10 +136,14 @@
     border-color: rgb(212 165 116 / 0.45);
   }
 
-  .rag-composer-bar--discover:focus-within {
-    border-color: rgb(212 165 116 / 0.65);
+  .rag-composer-bar--compare {
+    border-color: hsl(var(--primary) / 0.4);
+  }
+
+  .rag-composer-bar--compare:focus-within {
+    border-color: hsl(var(--primary) / 0.55);
     box-shadow:
-      0 0 0 3px rgb(212 165 116 / 0.1),
+      0 0 0 3px hsl(var(--primary) / 0.1),
       0 1px 0 hsl(0 0% 100% / 0.03) inset;
   }
 
