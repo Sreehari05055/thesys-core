@@ -56,6 +56,7 @@ admin = AdminConfig(
 class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY")
+    TYPESAFE_API_KEY = os.getenv("TYPESAFE_API_KEY")
     EMAIL = os.getenv("EMAIL")  # For citeas.org, we use email as the identifier
     try:
         system_prompt = get_system_prompt()
