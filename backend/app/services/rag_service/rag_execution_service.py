@@ -62,3 +62,68 @@ class RAGExecutionService:
             "context_text": self.format_context(context_list),
             "sources": sources,
         }
+    async def compare_research(self, queries: list[str], user_query: str, session_id: str, search_params=None):
+        """Retrieve COMPARE_TOP_N chunks per selected paper, classify pairs with Jev, keep confident relations."""
+        search_params = dict(search_params or {})
+        doc_ids = [d for d in (search_params.get("doc_ids") or []) if d]
+        if len(doc_ids) != 2:
+            return {
+                "type": "compare_research",
+                "context_text": "CompareResearch needs exactly two selected documents.",
+                "sources": [],
+            }
+        queries = queries or [user_query]
+        chunks_a = await self._chunks_for_doc(queries, user_query, session_id, search_params, doc_ids[0])
+        chunks_b = await self._chunks_for_doc(queries, user_query, session_id, search_params, doc_ids[1])
+        if not chunks_a or not chunks_b:
+            return {
+                "type": "compare_research",
+                "context_text": "Not enough retrieved chunks in both papers to compare.",
+                "sources": [],
+            }
+
+        logger.info(
+            "CompareResearch session %s: %d vs %d chunks",
+            session_id, len(chunks_a), len(chunks_b),
+        )
+        labels = await classify_pairs(chunks_a, chunks_b, user_query)
+
+        kept = []
+        used = {}
+        for qid, ans in labels.items():
+            if (ans.get("confidence") or 0) <= config.COMPARE_MIN_CONF:
+                continue
+            left, right = qid.split("_")
+            i, j = int(left[1:]), int(right[1:])
+            a, b = chunks_a[i], chunks_b[j]
+            kept.append((a, b, ans))
+            used[a["id"]] = a
+            used[b["id"]] = b
+
+        sources = [
+            {
+                "choice": ans["choice"],
+                "confidence": ans["confidence"],
+                "chunk_a": _chunk_without_embedding(a),
+                "chunk_b": _chunk_without_embedding(b),
+            }
+            for a, b, ans in kept
+        ]
+        unique = [_chunk_without_embedding(c) for c in used.values()]
+        lines = []
+        if unique:
+            lines.append(self.format_context(unique))
+        lines.append(f"Relations (confidence > {config.COMPARE_MIN_CONF}):")
+        if not kept:
+            lines.append("None.")
+        else:
+            for a, b, ans in kept:
+                lines.append(
+                    f"[{a['id']}] {ans['choice']} [{b['id']}] confidence_score={ans['confidence']}"
+                )
+        logger.info(f"Context Text: {"\n".join(lines)}")
+        return {
+            "type": "compare_research",
+            "context_text": "\n".join(lines),
+            "sources": sources,
+        }
