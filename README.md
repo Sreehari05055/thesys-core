@@ -8,11 +8,11 @@
 
 </div>
 
-Local research workspace: search open-access papers (OpenAlex and arXiv), upload PDFs, ask questions with on-page highlights, and export citations.
+Local research workspace: search open-access papers (OpenAlex and arXiv), upload PDFs, ask questions with on-page highlights, compare two papers on a claim, and export citations.
 
-Papers, embeddings, and chat history stay on disk. Citations jump to the PDF. Chat needs an OpenAI API key; ingest and retrieval run locally (Docling, Chroma, BGE).
+Papers, embeddings, and chat history stay on disk. Citations jump to the PDF. Chat needs an OpenAI API key; pairwise compare uses [TypeSafe](https://typesafe.ai) Jev. Ingest and retrieval run locally (Docling, Chroma, BGE).
 
-Copy `backend/.env.example` to `backend/.env`, set `OPENAI_API_KEY` and `EMAIL`, then:
+Copy `backend/.env.example` to `backend/.env`, set `OPENAI_API_KEY`, `EMAIL`, and `TYPESAFE_API_KEY` (compare), then:
 
 ```bash
 docker compose up --build
@@ -40,6 +40,10 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000). First build is large; first
 
 ![Figure citation highlight](screenshots/image_support.png)
 
+**Compare two papers.** Select two library PDFs, turn Compare on, and ask about one claim. [TypeSafe](https://typesafe.ai) Jev classifies each retrieved pair as corroboratory, contradictory, or neutral; the side panel lists those pairs with confidence. Without `TYPESAFE_API_KEY`, compare is unavailable.
+
+![Compare two papers on a claim](screenshots/compare.png)
+
 **Discover papers.** Search open-access literature from OpenAlex and arXiv in one pool, then preview a record, open the link, or add it to the library.
 
 ![Paper search](screenshots/search_papers.png)
@@ -57,6 +61,7 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000). First build is large; first
 - **Local RAG:** Docling ingest → Chroma + BGE embeddings → BGE reranker
 - **OCR:** off by default (`DO_OCR=false`); set `DO_OCR=true` for scanned PDFs
 - **Chat:** OpenAI via LangChain
+- **Compare:** TypeSafe Jev (`TYPESAFE_API_KEY`)
 - **Paper search:** OpenAlex + arXiv (open-access; optional OpenAlex API key)
 - **Citations:** CiteAs (uses `EMAIL`)
 
@@ -78,7 +83,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Set at least `OPENAI_API_KEY` and `EMAIL` in `backend/.env`. `HF_TOKEN` is optional (Hugging Face rate limits). `OPENALEX_API_KEY` is optional. `DO_OCR` defaults to `false`; set it to `true` to OCR scanned / image-only PDFs on ingest (slower).
+Set at least `OPENAI_API_KEY` and `EMAIL` in `backend/.env`. `TYPESAFE_API_KEY` is required for Compare (TypeSafe Jev). `HF_TOKEN` is optional (Hugging Face rate limits). `OPENALEX_API_KEY` is optional. `DO_OCR` defaults to `false`; set it to `true` to OCR scanned / image-only PDFs on ingest (slower).
 
 ```bash
 cd backend
