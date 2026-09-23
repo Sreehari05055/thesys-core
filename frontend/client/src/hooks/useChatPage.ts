@@ -36,7 +36,7 @@ import {
   mergeLoadedConversationMessages,
   streamingTurnMessages,
 } from "@/lib/conversationApi";
-import { buildConversationSourceIndex, collectCitedConversationSources, appendPendingChatSource, normalizeChatSources, updateLastBotMessage } from "@/lib/chatMessages";
+import { buildConversationSourceIndex, collectCitedConversationSources, collectCompareRelations, appendPendingChatSource, flattenRelationChunks, normalizeChatSources, normalizeCompareRelations, updateLastBotMessage } from "@/lib/chatMessages";
 import { consumeChatSseStream } from "@/lib/chatStream";
 import { preserveScrollPosition, scrollChatToBottom } from "@/lib/chatScroll";
 import type { RightPanelTab } from "@/types/chat";
@@ -113,6 +113,7 @@ export function useChatPage() {
   const [loadingSavedSummaryId, setLoadingSavedSummaryId] = useState<string | null>(null);
   const [selectedChatDocIds, setSelectedChatDocIds] = useState<string[]>([]);
   const [researchScopeByChat, setResearchScopeByChat] = useState<Record<string, ResearchScope>>({});
+  const [compareModeByChat, setCompareModeByChat] = useState<Record<string, boolean>>({});
   const [citationData, setCitationData] = useState<CitationDialogData | null>(null);
 
   const rawScope =
@@ -140,6 +141,10 @@ export function useChatPage() {
     () => collectCitedConversationSources(messages),
     [messages],
   );
+  const compareRelations = useMemo(
+    () => collectCompareRelations(messages),
+    [messages],
+  );
   const { knownSourceIds, allSourcesById, globalSourceNumberById } = useMemo(
     () => buildConversationSourceIndex(messages),
     [messages],
@@ -149,6 +154,8 @@ export function useChatPage() {
     () => activeDocumentsFromIngested(ingestedFiles, selectedChatDocIds),
     [ingestedFiles, selectedChatDocIds],
   );
+  const canCompare = researchScope === "library" && selectedChatDocs.length === 2;
+  const compareMode = canCompare && Boolean(activeChatId && compareModeByChat[activeChatId]);
 
   // ── Sidebar ──
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -481,9 +488,14 @@ export function useChatPage() {
 
   const attachSourceForChat = useCallback((src: Source) => {
     setPendingSourceRefs((prev) => appendPendingChatSource(prev, src));
+    if (activeChatId) {
+      setCompareModeByChat((prev) =>
+        prev[activeChatId] ? { ...prev, [activeChatId]: false } : prev,
+      );
+    }
     setLeftPanelMode("chat");
     requestAnimationFrame(() => chatInputRef.current?.focus());
-  }, []);
+  }, [activeChatId]);
 
   const openSummaryView = useCallback(
     (title: string, summaryId: string | null = null, rightTab: RightPanelTab = "sources") => {
@@ -588,6 +600,10 @@ export function useChatPage() {
             sourceIds: effectiveSourceIds,
             activeDocuments: scopedActiveDocuments,
             retrievalScope: scope,
+            compareMode:
+              libraryTurn &&
+              scopedActiveDocuments.length === 2 &&
+              Boolean(compareModeByChat[activeChatId]),
           }),
         },
         activeChat.sessionId,
@@ -622,6 +638,16 @@ export function useChatPage() {
             );
             break;
           case "sources": {
+            const relations = normalizeCompareRelations(event.sources);
+            if (relations.length > 0) {
+              setMessages((prev) =>
+                updateLastBotMessage(prev, {
+                  compareRelations: relations,
+                  sources: flattenRelationChunks(relations),
+                }),
+              );
+              break;
+            }
             const sources = normalizeChatSources(event.sources);
             setMessages((prev) =>
               updateLastBotMessage(prev, { sources }),
@@ -700,6 +726,14 @@ export function useChatPage() {
       } else {
         setActiveExternalPaper(null);
       }
+    },
+    [activeChatId],
+  );
+
+  const setCompareMode = useCallback(
+    (on: boolean) => {
+      if (!activeChatId) return;
+      setCompareModeByChat((prev) => ({ ...prev, [activeChatId]: on }));
     },
     [activeChatId],
   );
@@ -965,9 +999,14 @@ export function useChatPage() {
                   ...c,
                   messages: c.messages.map((m) => {
                     const nextSources = m.sources?.filter((s) => !tombstones.has(s.id));
+                    const nextRelations = m.compareRelations?.filter(
+                      (r) => !tombstones.has(r.chunk_a.id) && !tombstones.has(r.chunk_b.id),
+                    );
                     return {
                       ...m,
                       sources: nextSources && nextSources.length > 0 ? nextSources : undefined,
+                      compareRelations:
+                        nextRelations && nextRelations.length > 0 ? nextRelations : undefined,
                     };
                   }),
                 };
@@ -1175,6 +1214,16 @@ export function useChatPage() {
           };
         }),
       );
+      const relations = collectCompareRelations(loadedMessages);
+      if (relations.length > 0) {
+        setCompareModeByChat((prev) => ({ ...prev, [chatId]: true }));
+        const docIds = [
+          ...new Set(
+            relations.flatMap((r) => [r.chunk_a.doc_id, r.chunk_b.doc_id].filter(Boolean) as string[]),
+          ),
+        ];
+        if (docIds.length === 2) setSelectedChatDocIds(docIds);
+      }
       if (
         loadedMessages.some(
           (m) => m.sender === "bot" && (m.externalPapers?.length ?? 0) > 0,
@@ -1305,6 +1354,9 @@ export function useChatPage() {
     setSelectedChatDocIds,
     researchScope,
     setResearchScope,
+    canCompare,
+    compareMode,
+    setCompareMode,
     citationData,
     setCitationData,
     documentSummary,
@@ -1315,6 +1367,7 @@ export function useChatPage() {
     allSourcesById,
     globalSourceNumberById,
     panelSources,
+    compareRelations,
     selectedChatDocs,
     sidebarOpen,
     setSidebarOpen,
