@@ -3,7 +3,7 @@ import re
 from typing import AsyncGenerator, List, Dict, Any
 from app import logger
 from app.services.langchain_handler.langchain_service import LangChainService
-from app.services.langchain_handler.tool_definitions import FetchResearch, get_tool_schemas
+from app.services.langchain_handler.tool_definitions import CompareResearch, FetchResearch, get_tool_schemas
 from app.services.session_title_service import SessionTitleService
 from app.prompts.prompts import (
     format_active_documents_scope,
@@ -26,7 +26,9 @@ class ChatbotService:
         self.tools = get_tool_schemas()
         self.title_service = SessionTitleService()
 
-    def _tools_for_turn(self, research_mode: bool, blocked_tools: set[str]) -> list:
+    def _tools_for_turn(self, research_mode: bool, compare_mode: bool, blocked_tools: set[str]) -> list:
+        if compare_mode:
+            return [CompareResearch]
         if research_mode:
             return [FetchResearch]
         return [t for t in self.tools if t.__name__ not in blocked_tools]
@@ -171,6 +173,7 @@ class ChatbotService:
     async def _generate_response(self, session_id: str, query: str, settings: Dict[str, Any]) -> AsyncGenerator[str, None]:
         try:
             research_mode = settings.get("research_mode")
+            compare_mode = bool(settings.get("compare_mode"))
             search_params = {
                 "source_ids": settings.get("source_ids") or [],
                 "doc_ids": settings.get("doc_ids") or [],
@@ -178,6 +181,7 @@ class ChatbotService:
                 "provider": settings.get("provider"),
                 "model": settings.get("model"),
                 "research_mode": bool(research_mode),
+                "compare_mode": compare_mode,
             }
 
             pending_sources = []
@@ -203,9 +207,13 @@ class ChatbotService:
             if research_mode:
                 blocked_tools.add("SearchResearch")
 
-            turn_tools = self._tools_for_turn(research_mode, blocked_tools)
+            turn_tools = self._tools_for_turn(research_mode, compare_mode, blocked_tools)
             llm_with_tools = (
-                llm.bind_tools(turn_tools, parallel_tool_calls=False)
+                llm.bind_tools(
+                    turn_tools,
+                    parallel_tool_calls=False,
+                    **({"tool_choice": "CompareResearch"} if compare_mode else {}),
+                )
                 if turn_tools
                 else llm
             )
@@ -252,7 +260,7 @@ class ChatbotService:
                     session_id,
                     len(session_source_ids),
                 )
-            if source_ids:
+            if source_ids and not compare_mode:
                 allowed_source_ids |= {str(s).lower() for s in source_ids if s}
                 try:
                     prefetch_result = await self.rag_service.get_info(
@@ -273,7 +281,7 @@ class ChatbotService:
                         allowed_source_ids |= self._extract_source_ids_from_context(prefetch_result.get("context_text") or "")
                         lc_messages[-1] = HumanMessage(content=augmented_content)
                         blocked_tools.add("SearchResearch")
-                        turn_tools = self._tools_for_turn(research_mode, blocked_tools)
+                        turn_tools = self._tools_for_turn(research_mode, compare_mode, blocked_tools)
                         llm_for_turn = (
                             llm.bind_tools(turn_tools, parallel_tool_calls=False)
                             if turn_tools
@@ -341,6 +349,15 @@ class ChatbotService:
                     except Exception as e:
                         tool_result = e
 
+                    if compare_mode and isinstance(tool_result, Exception):
+                        err = "Compare is unavailable."
+                        await self.store.add_message(
+                            session_id, {"role": "assistant", "content": err},
+                        )
+                        yield f"data: {json.dumps({'content': err}, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'end': True, 'content_final': err}, ensure_ascii=False)}\n\n"
+                        break
+
                     tool_result_content = ""
                     tool_papers = None
                     if isinstance(tool_result, Exception):
@@ -357,6 +374,19 @@ class ChatbotService:
                                 tool_result.get("context_text")
                                 or "No matching papers found."
                             )
+                    elif isinstance(tool_result, dict) and tool_result.get("type") == "compare_research":
+                        sources = tool_result.get("sources", [])
+                        pending_sources.extend(sources)
+                        for src in sources:
+                            for side in ("chunk_a", "chunk_b"):
+                                sid = (src.get(side) or {}).get("id")
+                                if sid:
+                                    seen_source_ids.add(sid)
+                                    allowed_source_ids.add(str(sid).lower())
+                        tool_result_content = tool_result.get("context_text") or "No comparison results."
+                        allowed_source_ids |= self._extract_source_ids_from_context(tool_result_content)
+                        if pending_sources:
+                            yield f"data: {json.dumps({'sources': pending_sources}, ensure_ascii=False)}\n\n"
                     elif isinstance(tool_result, dict) and tool_result.get("type") == "search_research" and "context_text" in tool_result:
                         sources = tool_result.get("sources", [])
 
@@ -394,6 +424,8 @@ class ChatbotService:
                         },
                         papers=tool_papers,
                     )
+                    if compare_mode:
+                        llm_for_turn = llm
 
                 else:
                     final_sources = pending_sources if pending_sources else None
