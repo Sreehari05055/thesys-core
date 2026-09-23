@@ -62,7 +62,13 @@ class LocalHistoryStore(BaseHistoryStore):
 
     def _create_session(self) -> str:
         chat_id = str(uuid.uuid4())
-        self._conn.execute("INSERT INTO chats (id) VALUES (?)", (chat_id,))
+        row = self._conn.execute(
+            "SELECT provider, model FROM llm_models WHERE is_default = 1 AND is_active = 1"
+        ).fetchone()
+        if not row:
+            raise RuntimeError("No default active LLM in llm_models")
+        config = json.dumps({"provider": row["provider"], "model": row["model"]})
+        self._conn.execute("INSERT INTO chats (id, config) VALUES (?, ?)", (chat_id, config))
         self._conn.commit()
         return chat_id
 
