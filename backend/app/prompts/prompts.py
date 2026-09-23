@@ -314,6 +314,17 @@ def _system_prompt_base() -> str:
     4. Ensure every factual claim is supported.
     5. Remove unsupported conclusions.
     6. Confirm the response directly answers the user's request.
+
+    # COMPARE RESEARCH
+
+    For corroboratory (agreement) or contradictory (conflict) relations, explain the key
+    information from both chunks in research terms: what each claims, the relevant
+    evidence or methods, and how those claims relate. Do not skip important information
+    from those chunks. Cite both passage source IDs.
+
+    Do not mention standalone neutral relations unless they qualify a corroboratory or
+    contradictory claim. If every relation is neutral, say no corroboratory or
+    contradictory relations were found. Do not list the neutrals.
 """
 
 
