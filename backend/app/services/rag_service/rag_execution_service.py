@@ -1,5 +1,7 @@
 from app import logger
 from typing import Any, Dict, List
+from app.core.config import config
+from app.services.jev_service import classify_pairs
 
 
 def _chunk_without_embedding(chunk: Dict[str, Any]) -> Dict[str, Any]:
@@ -43,12 +45,17 @@ class RAGExecutionService:
             for n in context_list
         ])
 
+    async def _chunks_for_doc(self, queries, user_query, session_id, search_params, doc_id):
+        params = dict(search_params)
+        params["doc_ids"] = [doc_id]
+        params["top_n"] = config.COMPARE_TOP_N
+        return await self.rag_pipeline._get_corpus_data(
+            queries, user_query, session_id, search_params=params
+        )
+
     async def get_info(self, queries: list[str], user_query: str, session_id: str, search_params=None):
         logger.info(f"Fetching quick knowledge for session {session_id} using keywords: {queries}")
         context_list = await self.rag_pipeline._get_corpus_data(queries, user_query, session_id, search_params=search_params)
-        
-        logger.info(f"Retrieved {len(context_list)} context chunks from RAG index for session {session_id}.")
-
         sources = [_chunk_without_embedding(c) for c in context_list]
         return {
             "type": "search_research",
