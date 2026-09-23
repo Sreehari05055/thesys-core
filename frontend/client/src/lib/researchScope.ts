@@ -11,10 +11,14 @@ export function researchScopePlaceholder(
     pendingCitations: number;
     selectedDocCount: number;
     singleDocName?: string;
+    compareMode?: boolean;
   },
 ): string {
   if (scope === "discover") {
     return "Find open-access papers on the web — e.g. recent work on CRISPR delivery…";
+  }
+  if (options.compareMode) {
+    return "Compare these two papers on a claim or question…";
   }
   if (options.pendingCitations > 0) {
     return "Ask about the cited passage…";
