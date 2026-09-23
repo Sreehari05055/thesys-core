@@ -41,6 +41,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
             session_settings = await history_store.get_settings(session_id)
             question = chat_request.question
             research_mode = chat_request.research_mode
+            compare_mode = chat_request.compare_mode
             source_ids = chat_request.source_ids
             doc_ids = chat_request.resolved_doc_ids()
             active_documents = chat_request.active_documents_dicts()
@@ -52,6 +53,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
                 "doc_ids": doc_ids,
                 "active_documents": active_documents,
                 "research_mode": research_mode,
+                "compare_mode": compare_mode,
             }
 
             async def event_stream():
