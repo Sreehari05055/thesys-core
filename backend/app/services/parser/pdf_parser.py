@@ -63,7 +63,7 @@ def _build_converter() -> DocumentConverter:
         url=AnyUrl("https://api.openai.com/v1/chat/completions"),
         headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
         params={
-            "model": "gpt-5.6-luna",
+            "model": "gpt-6-luna",
             "reasoning_effort": "low",
         },
         timeout=60.0,
