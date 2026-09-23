@@ -66,7 +66,7 @@ export function ChatComposer({
             data-testid={testIdInput}
           />
           <div className="mt-1 flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center">{insetFooter}</div>
+            <div className="flex min-w-0 items-center gap-1.5">{insetFooter}</div>
             <div
               className={cn(
                 "shrink-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out motion-reduce:transition-none",
