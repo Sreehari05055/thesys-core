@@ -25,6 +25,7 @@ class RAGConfig:
     top_k: int = 20
     top_n: int = 8
     compare_top_n: int = 4
+    compare_min_conf: float = 0.70
     max_pdf_pages: int = 40
 
 
@@ -50,6 +51,7 @@ admin = AdminConfig(
         top_k=10,
         top_n=8,
         compare_top_n=4,
+        compare_min_conf=0.70,
         max_pdf_pages=150,
     ),
     max_conversation_turns=10
@@ -76,6 +78,7 @@ class Config:
         TOP_K = admin.rag.top_k
         TOP_N = admin.rag.top_n
         COMPARE_TOP_N = admin.rag.compare_top_n
+        COMPARE_MIN_CONF = admin.rag.compare_min_conf
 
         USE_GPU_ACCELERATION = HardwareDetector.should_use_acceleration()
         
