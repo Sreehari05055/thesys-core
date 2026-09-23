@@ -34,14 +34,26 @@ export type HighlightAction = {
   bboxes: [number, number, number, number][];
 };
 
+export type CompareRelation = {
+  choice: string;
+  confidence: number;
+  chunk_a: Source;
+  chunk_b: Source;
+};
+
 export type ChatMessage = {
   sender: "user" | "bot";
   text: string;
   raw?: string;
   sources?: Source[];
+  compareRelations?: CompareRelation[];
   externalPapers?: ExternalPaper[];
   highlightAction?: HighlightAction;
 };
+
+export function compareRelationKey(relation: CompareRelation): string {
+  return `${relation.chunk_a.id}|${relation.chunk_b.id}|${relation.choice}`;
+}
 
 const DEFAULT_PENDING_SOURCE_LIMIT = 2;
 
@@ -79,14 +91,24 @@ function externalPapersFromRecord(record: Record<string, unknown>): ExternalPape
 function botMessageFields(
   record: Record<string, unknown>,
   pendingExternalPapers: ExternalPaper[],
-): Pick<ChatMessage, "sources" | "externalPapers" | "highlightAction"> {
+): Pick<ChatMessage, "sources" | "compareRelations" | "externalPapers" | "highlightAction"> {
   const externalPapers = mergeExternalPapers(
     pendingExternalPapers,
     externalPapersFromRecord(record),
   );
 
+  const compareRelations = Array.isArray(record.sources)
+    ? normalizeCompareRelations(record.sources)
+    : [];
+  const sources = compareRelations.length
+    ? flattenRelationChunks(compareRelations)
+    : Array.isArray(record.sources)
+      ? normalizeChatSources(record.sources)
+      : undefined;
+
   return {
-    sources: Array.isArray(record.sources) ? normalizeChatSources(record.sources) : undefined,
+    sources,
+    compareRelations: compareRelations.length ? compareRelations : undefined,
     externalPapers: externalPapers.length > 0 ? externalPapers : undefined,
     highlightAction:
       record.highlightAction && typeof record.highlightAction === "object"
@@ -299,6 +321,52 @@ export function normalizeChatSources(raw: unknown): Source[] {
   return normalizeSourcesFromApi(raw, { filename: "", doc_id: "" });
 }
 
+export function flattenRelationChunks(relations: CompareRelation[]): Source[] {
+  const out: Source[] = [];
+  const seen = new Set<string>();
+  for (const relation of relations) {
+    for (const chunk of [relation.chunk_a, relation.chunk_b]) {
+      if (!chunk.id || seen.has(chunk.id)) continue;
+      seen.add(chunk.id);
+      out.push(chunk);
+    }
+  }
+  return out;
+}
+
+/** Pair payloads from CompareResearch (`chunk_a` + `chunk_b`). */
+export function normalizeCompareRelations(raw: unknown): CompareRelation[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CompareRelation[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const sides = normalizeSourcesFromApi(
+      [record.chunk_a, record.chunk_b],
+      { filename: "", doc_id: "" },
+    );
+    if (sides.length !== 2) continue;
+    const confidence = typeof record.confidence === "number" ? record.confidence : 0;
+    const choice = typeof record.choice === "string" ? record.choice : "";
+    out.push({ choice, confidence, chunk_a: sides[0]!, chunk_b: sides[1]! });
+  }
+  return out;
+}
+
+export function collectCompareRelations(messages: ChatMessage[]): CompareRelation[] {
+  const result: CompareRelation[] = [];
+  const seen = new Set<string>();
+  for (const msg of messages) {
+    for (const relation of msg.compareRelations ?? []) {
+      const key = compareRelationKey(relation);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(relation);
+    }
+  }
+  return result;
+}
+
 /** Normalize RAG source objects from summarize/chat API payloads. */
 export function normalizeSourcesFromApi(
   raw: unknown,
@@ -406,14 +474,17 @@ export function buildSourceIndex(sources: Source[]) {
 
 /** Cited sources across a conversation, in order of first LLM citation. */
 export function collectCitedConversationSources(messages: ChatMessage[]): Source[] {
-  const allSources = messages.flatMap((m) => m.sources ?? []);
+  const allSources = messages.flatMap((m) => [
+    ...(m.sources ?? []),
+    ...flattenRelationChunks(m.compareRelations ?? []),
+  ]);
   const fullIndex = buildSourceIndex(allSources);
 
   const result: Source[] = [];
   const seen = new Set<string>();
 
   for (const msg of messages) {
-    if (msg.sender !== "bot" || !msg.sources?.length) continue;
+    if (msg.sender !== "bot") continue;
     const text = (msg.raw ?? msg.text)?.trim();
     if (!text) continue;
 
@@ -469,14 +540,47 @@ export function updateLastBotMessage(
             ]
           : currentPapers;
 
+      const currentRelations = updated[i].compareRelations ?? [];
+      const patchRelations = patch.compareRelations ?? [];
+      const mergedRelations =
+        patchRelations.length > 0
+          ? [
+              ...currentRelations,
+              ...patchRelations.filter(
+                (r) => !currentRelations.some((cr) => compareRelationKey(cr) === compareRelationKey(r)),
+              ),
+            ]
+          : currentRelations;
+
       updated[i] = {
         ...updated[i],
         ...patch,
         sources: mergedSources,
+        compareRelations: mergedRelations.length ? mergedRelations : updated[i].compareRelations,
         externalPapers: patch.externalPapers !== undefined ? mergedPapers : updated[i].externalPapers,
       };
       return updated;
     }
   }
   return updated;
+}
+
+// ponytail: follow-up Ask cites pair chunk ids that live on an earlier compare message
+{
+  const pair: Source = {
+    id: "1883d7fb8a84291a26236be42276a04c_c36",
+    content: "no effect",
+    title: "ranehill.pdf",
+    pages: [2],
+    bboxes: [],
+    precise_bboxes: [],
+    score: 1,
+  };
+  const cited = collectCitedConversationSources([
+    { sender: "bot", text: "first", sources: [pair] },
+    { sender: "bot", text: `no effect [${pair.id}]` },
+  ]);
+  if (!cited.some((s) => s.id === pair.id)) {
+    throw new Error("collectCitedConversationSources should resolve pair ids cited on a later turn");
+  }
 }
