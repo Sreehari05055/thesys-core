@@ -162,22 +162,38 @@ class LocalHistoryStore(BaseHistoryStore):
         ).fetchall()
         sources_by_msg: dict[str, list] = {}
         for src in self._conn.execute(
-            "SELECT message_id, chunk_id, doc_id, title, pages, bbox, precise_bbox, score, content "
-            "FROM sources WHERE chat_id = ?",
+            "SELECT message_id, chunk_id, doc_id, title, pages, bbox, precise_bbox, score, content, "
+            "pair_id, choice, side FROM sources WHERE chat_id = ? ORDER BY rowid",
             (session_id,),
         ):
-            sources_by_msg.setdefault(src["message_id"], []).append(
-                {
-                    "id": src["chunk_id"],
-                    "doc_id": src["doc_id"],
-                    "title": src["title"],
-                    "pages": json.loads(src["pages"]) if src["pages"] else [],
-                    "bboxes": json.loads(src["bbox"]) if src["bbox"] else [],
-                    "precise_bboxes": json.loads(src["precise_bbox"]) if src["precise_bbox"] else [],
-                    "score": src["score"],
-                    "content": src["content"],
+            chunk = {
+                "id": src["chunk_id"],
+                "doc_id": src["doc_id"],
+                "title": src["title"],
+                "pages": json.loads(src["pages"]) if src["pages"] else [],
+                "bboxes": json.loads(src["bbox"]) if src["bbox"] else [],
+                "precise_bboxes": json.loads(src["precise_bbox"]) if src["precise_bbox"] else [],
+                "score": src["score"],
+                "content": src["content"],
+            }
+            bucket = sources_by_msg.setdefault(src["message_id"], [])
+            if not src["pair_id"]:
+                bucket.append(chunk)
+                continue
+            pair = next((p for p in bucket if p.get("pair_id") == src["pair_id"]), None)
+            if pair is None:
+                pair = {
+                    "pair_id": src["pair_id"],
+                    "choice": src["choice"] or "",
+                    "confidence": src["score"] or 0,
+                    "chunk_a": None,
+                    "chunk_b": None,
                 }
-            )
+                bucket.append(pair)
+            pair["chunk_a" if src["side"] != "b" else "chunk_b"] = chunk
+            if src["score"] is not None:
+                pair["confidence"] = src["score"]
+
         papers_by_msg: dict[str, list] = {}
         for paper in self._conn.execute(
             "SELECT message_id, paper_id, title, authors, publication_year, doi, abstract, "
@@ -251,7 +267,8 @@ class LocalHistoryStore(BaseHistoryStore):
         for src in self._iter_sources(sources):
             self._conn.execute(
                 "INSERT INTO sources (id, message_id, chat_id, chunk_id, doc_id, title, pages, "
-                "bbox, precise_bbox, score, content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "bbox, precise_bbox, score, content, pair_id, choice, side) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(uuid.uuid4()),
                     mid,
@@ -264,6 +281,9 @@ class LocalHistoryStore(BaseHistoryStore):
                     _dumps(src.get("precise_bbox") or src.get("precise_bboxes")),
                     src.get("score"),
                     src.get("content") or src.get("text"),
+                    src.get("pair_id"),
+                    src.get("choice"),
+                    src.get("side"),
                 ),
             )
         for paper in papers or ():
@@ -299,9 +319,16 @@ class LocalHistoryStore(BaseHistoryStore):
             return
         for src in sources:
             if "chunk_a" in src:
-                yield src["chunk_a"]
-                if "chunk_b" in src:
-                    yield src["chunk_b"]
+                pair_id = str(uuid.uuid4())
+                for side, chunk in (("a", src.get("chunk_a")), ("b", src.get("chunk_b"))):
+                    if not chunk:
+                        continue
+                    row = dict(chunk)
+                    row["pair_id"] = pair_id
+                    row["choice"] = src.get("choice")
+                    row["side"] = side
+                    row["score"] = src.get("confidence")
+                    yield row
             else:
                 yield src
 
