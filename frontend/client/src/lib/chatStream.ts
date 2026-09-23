@@ -10,22 +10,12 @@ export type ChatStreamEvent =
   | { type: "session_title"; title: string }
   | { type: "done" };
 
-function isCompareSourcesPayload(sources: unknown[]): boolean {
-  return (
-    sources.length > 0 &&
-    typeof sources[0] === "object" &&
-    sources[0] !== null &&
-    "chunk_a" in sources[0]
-  );
-}
-
 function parseStreamPayload(data: Record<string, unknown>): ChatStreamEvent | null {
   if (typeof data.session_title === "string" && data.session_title.trim()) {
     return { type: "session_title", title: data.session_title.trim() };
   }
 
   if (data.sources && Array.isArray(data.sources)) {
-    if (isCompareSourcesPayload(data.sources)) return null;
     return { type: "sources", sources: data.sources };
   }
 
