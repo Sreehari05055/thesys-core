@@ -30,7 +30,7 @@ class SessionTitleService:
         try:
             llm = LangChainService.get_llm(provider=provider, model_name=model_name)
             try:
-                llm = llm.bind(max_tokens=32, temperature=0.3)
+                llm = llm.bind(max_tokens=32, reasoning_effort="none")
             except Exception:
                 pass
             response = await asyncio.wait_for(
