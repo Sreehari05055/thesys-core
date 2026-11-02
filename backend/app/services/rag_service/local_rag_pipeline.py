@@ -185,31 +185,15 @@ class LocalRAGPipeline(BaseRAGPipeline):
         except Exception:
             pass
 
-    async def _fetch_embeddings(self, session_id: str, chunk_ids: list) -> dict:
-        chunk_ids = [cid for cid in chunk_ids if cid]
-        if not chunk_ids:
-            return {}
-        data = self._collection(session_id).get(ids=chunk_ids, include=["embeddings"])
-        return {
-            nid: emb
-            for nid, emb in zip(data["ids"], data["embeddings"])
-            if emb is not None
-        }
-
     def _chunks_by_ids(self, session_id: str, chunk_ids: list) -> list:
         data = self._collection(session_id).get(
             ids=list(chunk_ids),
-            include=["documents", "metadatas", "embeddings"],
+            include=["documents", "metadatas"],
         )
         return [
-            self.chunk_dict_from_row(
-                nid,
-                text or "",
-                meta or {},
-                embedding=emb,
-            )
-            for nid, text, meta, emb in zip(
-                data["ids"], data["documents"], data["metadatas"], data["embeddings"]
+            self.chunk_dict_from_row(nid, text or "", meta or {})
+            for nid, text, meta in zip(
+                data["ids"], data["documents"], data["metadatas"]
             )
         ]
 

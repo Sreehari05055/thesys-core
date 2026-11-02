@@ -48,11 +48,6 @@ class BaseRAGPipeline(ABC):
         ...
 
     @abstractmethod
-    async def _fetch_embeddings(self, session_id: str, chunk_ids: list) -> dict:
-        """Return chunk id → embedding map for the given ids."""
-        ...
-
-    @abstractmethod
     async def _load_index(self, session_id: str):
         """Load or establish an in-memory index handle for the session."""
         ...
@@ -129,12 +124,7 @@ class BaseRAGPipeline(ABC):
         diverse = self._best_child_per_parent(unique_results)
         candidates = self._remove_reference_sections(diverse)
         final_results = await self._global_reranker(candidates, user_query, top_n=top_n)
-        chunk_ids = [n.node.id_ for n in final_results]
-        embedding_map = await self._fetch_embeddings(session_id, chunk_ids)
-        return [
-            self._node_to_corpus_dict(n, embedding_map)
-            for n in final_results
-        ]
+        return [self._node_to_corpus_dict(n) for n in final_results]
 
     @staticmethod
     def _corpus_display_fields(meta: dict, child_text: str) -> tuple[str, list, list, list]:
@@ -154,14 +144,11 @@ class BaseRAGPipeline(ABC):
         meta: dict,
         *,
         score: float = 0.0,
-        embedding=None,
     ) -> dict:
         """Build a corpus/source dict from a child chunk row + metadata."""
         content, pages, bboxes, precise_bboxes = BaseRAGPipeline._corpus_display_fields(
             meta, child_text or ""
         )
-        if embedding is not None and hasattr(embedding, "tolist"):
-            embedding = embedding.tolist()
         return {
             "content": content,
             "id": node_id,
@@ -174,16 +161,12 @@ class BaseRAGPipeline(ABC):
             "precise_bboxes": precise_bboxes,
             "score": score,
             "reference_section": bool(meta.get("reference_section")),
-            "embedding": embedding,
         }
 
-    def _node_to_corpus_dict(self, n, embedding_map: dict) -> dict:
+    def _node_to_corpus_dict(self, n) -> dict:
         meta = n.node.metadata or {}
         child_text = n.get_content(MetadataMode.NONE)
-        emb = embedding_map.get(n.node.id_)
-        return self.chunk_dict_from_row(
-            n.node.id_, child_text, meta, score=n.score, embedding=emb
-        )
+        return self.chunk_dict_from_row(n.node.id_, child_text, meta, score=n.score)
 
     def _compute_relevance_threshold(self, reranked_nodes: list) -> float:
         """Threshold from score spread (Cohere-style vs wider ranges)."""
