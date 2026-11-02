@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from typing import Any, List
@@ -172,10 +173,10 @@ class LocalRAGPipeline(BaseRAGPipeline):
         BaseRAGPipeline.session_indices[session_id] = self._fresh_index(session_id)
 
     async def _add_to_index(self, session_id: str, file_paths: List[str], offline: bool = False):
-        nodes = _pdf_docs_to_nodes(
-            list(iter_documents(self._files_dir(session_id), file_paths, offline=offline)),
-            session_id,
+        pdf_docs = await asyncio.to_thread(
+            lambda: list(iter_documents(self._files_dir(session_id), file_paths, offline=offline)),
         )
+        nodes = _pdf_docs_to_nodes(pdf_docs, session_id)
         index = self._fresh_index(session_id)
         index.insert_nodes(nodes)
         BaseRAGPipeline.session_indices[session_id] = index
@@ -184,7 +185,8 @@ class LocalRAGPipeline(BaseRAGPipeline):
         await self.delete_session_vectors(session_id)
         data_dir = self._files_dir(session_id)
         os.makedirs(data_dir, exist_ok=True)
-        nodes = _pdf_docs_to_nodes(list(iter_documents(data_dir)), session_id)
+        pdf_docs = await asyncio.to_thread(lambda: list(iter_documents(data_dir)))
+        nodes = _pdf_docs_to_nodes(pdf_docs, session_id)
         self._index_nodes(session_id, nodes)
 
     async def delete_session_vectors(self, session_id: str) -> None:
