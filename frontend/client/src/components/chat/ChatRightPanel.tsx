@@ -57,12 +57,14 @@ function CompareRelationCard({
   getDocDisplayName,
   onOpenChunk,
   onAskPair,
+  askDisabled,
 }: {
   index: number;
   relation: CompareRelation;
   getDocDisplayName: (src: Source) => string;
   onOpenChunk: (src: Source) => void;
   onAskPair: (relation: CompareRelation) => void;
+  askDisabled?: boolean;
 }) {
   return (
     <div className="rounded-lg border border-border bg-secondary overflow-hidden">
@@ -78,9 +80,10 @@ function CompareRelationCard({
         </div>
         <button
           type="button"
-          title="Ask about this pair"
+          disabled={askDisabled}
+          title={askDisabled ? "Ask needs AI — unavailable in Without AI sessions" : "Ask about this pair"}
           onClick={() => onAskPair(relation)}
-          className="flex shrink-0 items-center gap-1 px-2 py-1 rounded-md bg-primary/12 hover:bg-primary/22 text-primary text-[11px] font-medium transition-colors"
+          className="flex shrink-0 items-center gap-1 px-2 py-1 rounded-md bg-primary/12 hover:bg-primary/22 text-primary text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary/12"
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
           Ask
@@ -190,9 +193,11 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
     setUsePreciseSourceHighlight,
     compareMode,
     compareRelations,
+    offlineMode,
   } = model;
 
   const panelHidden = !showRightPanel;
+  const askDisabled = offlineMode;
   const viewingSummary = leftPanelMode === "summary";
   const showExternalPaper = activeExternalPaper != null && !viewingSummary;
   const sidebarSources = viewingSummary ? (documentSummary?.sources ?? []) : panelSources;
@@ -304,6 +309,7 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
                             index={index + 1}
                             relation={relation}
                             getDocDisplayName={getDocDisplayName}
+                            askDisabled={askDisabled}
                             onOpenChunk={(src) =>
                               selectSourceForPreview(src, {
                                 showPdf: true,
@@ -368,9 +374,14 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
                                     </button>
                                     <button
                                       type="button"
-                                      title="Ask about this source"
+                                      disabled={askDisabled}
+                                      title={
+                                        askDisabled
+                                          ? "Ask needs AI — unavailable in Without AI sessions"
+                                          : "Ask about this source"
+                                      }
                                       onClick={(e) => { e.stopPropagation(); attachSourceForChat(src); }}
-                                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/12 hover:bg-primary/22 text-primary text-[11px] font-medium transition-colors"
+                                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/12 hover:bg-primary/22 text-primary text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary/12"
                                     >
                                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                                       Ask about this
@@ -433,11 +444,17 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
                         </button>
                         <button
                           type="button"
+                          disabled={askDisabled}
+                          title={
+                            askDisabled
+                              ? "Ask needs AI — unavailable in Without AI sessions"
+                              : undefined
+                          }
                           onClick={() => {
                             if (!activeSource) return;
                             attachSourceForChat(activeSource);
                           }}
-                          className="shrink-0 h-7 px-2.5 rounded-md bg-primary/12 border border-primary/25 text-primary hover:bg-primary/22 transition-colors flex items-center gap-1 text-[11px] font-medium"
+                          className="shrink-0 h-7 px-2.5 rounded-md bg-primary/12 border border-primary/25 text-primary hover:bg-primary/22 transition-colors flex items-center gap-1 text-[11px] font-medium disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary/12"
                         >
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                           Ask
