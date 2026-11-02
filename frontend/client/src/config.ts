@@ -12,6 +12,9 @@ const config = {
 } as const;
 
 export const API_URLS = {
+  /** GET — `{ openai_configured }`. No session. */
+  status: `${config.apiBaseUrl}/api/status`,
+
   chat: `${config.apiBaseUrl}/api/chat`,
 
   listConversations: `${config.apiBaseUrl}/api/conversations`,
