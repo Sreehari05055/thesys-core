@@ -12,8 +12,12 @@ export function researchScopePlaceholder(
     selectedDocCount: number;
     singleDocName?: string;
     compareMode?: boolean;
+    offline?: boolean;
   },
 ): string {
+  if (options.offline) {
+    return "Find passages in your papers…";
+  }
   if (scope === "discover") {
     return "Find open-access papers on the web — e.g. recent work on CRISPR delivery…";
   }
