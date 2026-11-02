@@ -47,7 +47,7 @@ admin = AdminConfig(
     ),
     rag=RAGConfig(
         child_chunk_size=64,
-        parent_chunk_size=448,
+        parent_chunk_size=512,
         top_k=10,
         top_n=8,
         compare_top_n=4,
