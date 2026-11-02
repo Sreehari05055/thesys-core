@@ -140,14 +140,12 @@ class ChatbotService:
         """Remove citation tokens not present in `allowed_ids`.
         Only affects bracket tokens that look like our chunk ids: `[<hex>_cN]`.
         """   
-        if not text:
-            return text
         chunk_id_pat = r"\[([0-9a-fA-F]{16,64}_c\d+)\]"
         if not allowed_ids:
             return re.sub(chunk_id_pat, "", text)
 
         def _repl(m: re.Match) -> str:
-            token = (m.group(1) or "").lower()
+            token = m.group(1).lower()
             return m.group(0) if token in allowed_ids else ""
 
         return re.sub(chunk_id_pat, _repl, text)
@@ -157,7 +155,7 @@ class ChatbotService:
         """Collect chunk IDs from persisted message sources and inline citations."""
         ids: set[str] = set()
         chunk_id_pat = r"([0-9a-fA-F]{16,64}_c\d+)"
-        for msg in stored_messages or []:
+        for msg in stored_messages:
             for src in msg.get("sources") or []:
                 if isinstance(src, dict):
                     if src.get("id"):
@@ -173,14 +171,6 @@ class ChatbotService:
             ids |= ChatbotService._extract_source_ids_from_context(content)
         return ids
 
-    @staticmethod
-    def _append_context_to_human_message(lc_messages: List[BaseMessage], section_title: str, body: str) -> None:
-        if not body or not lc_messages:
-            return
-        last = lc_messages[-1]
-        base = getattr(last, "content", "") or ""
-        lc_messages[-1] = HumanMessage(content=f"{base}\n\n[{section_title}]\n{body}")
-
     async def _generate_response(self, session_id: str, query: str, settings: Dict[str, Any]) -> AsyncGenerator[str, None]:
         try:
             research_mode = settings.get("research_mode")
@@ -195,9 +185,44 @@ class ChatbotService:
                 "compare_mode": compare_mode,
             }
 
+            if settings.get("offline"):
+                stored_msgs = await self.store.get_messages(session_id, include_sources=False)
+                is_first_user_message = not any(m.get("role") == "user" for m in stored_msgs)
+                if is_first_user_message:
+                    session_title = await self.title_service.generate_and_set_first_title(
+                        self.store,
+                        session_id,
+                        query,
+                        offline=True,
+                    )
+                    if session_title:
+                        yield f"data: {json.dumps({'session_title': session_title}, ensure_ascii=False)}\n\n"
+
+                user_msg: Dict[str, Any] = {"role": "user", "content": query}
+                active_documents = settings.get("active_documents") or []
+                if active_documents:
+                    user_msg["active_documents"] = active_documents
+                await self.store.add_message(session_id, user_msg)
+                result = await self.rag_service.get_info(
+                    queries=[query],
+                    user_query=query,
+                    session_id=session_id,
+                    search_params=search_params,
+                )
+                sources = result.get("sources") or []
+                if sources:
+                    yield f"data: {json.dumps({'sources': sources}, ensure_ascii=False)}\n\n"
+                await self.store.add_message(
+                    session_id,
+                    {"role": "assistant", "content": ""},
+                    sources=sources or None,
+                )
+                yield f"data: {json.dumps({'end': True, 'content_final': ''}, ensure_ascii=False)}\n\n"
+                return
+
             pending_sources = []
             seen_source_ids = set()
-            stored_msgs = await self.store.get_messages(session_id)
+            stored_msgs = await self.store.get_messages(session_id, include_sources=False)
             is_first_user_message = not any(m.get("role") == "user" for m in stored_msgs)
 
             session_title = None
