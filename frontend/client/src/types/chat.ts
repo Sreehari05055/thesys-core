@@ -10,6 +10,8 @@ export type Chat = {
   /** When the session was last opened or used (ms). Drives sidebar order when set. */
   lastAccessAt?: number;
   sessionId: string;
+  /** Sticky session mode from backend chat config. */
+  offline?: boolean;
 };
 
 /** Item from GET /api/conversations */
@@ -18,6 +20,7 @@ export type ConversationSummary = {
   title?: string;
   created_at?: string;
   last_access?: string;
+  offline?: boolean;
   /** Legacy shapes */
   sessionId?: string;
   id?: string;
@@ -29,6 +32,7 @@ export type ConversationSummary = {
 export type ConversationLoadResponse = {
   session_id?: string;
   title?: string;
+  offline?: boolean;
   messages?: unknown;
 };
 
