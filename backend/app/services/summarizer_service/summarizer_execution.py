@@ -35,14 +35,14 @@ class SummarizerExecutionService:
         if not isinstance(result, dict):
             return result
 
-        names = [os.path.basename((n or "").strip()) for n in (filenames or []) if (n or "").strip()]
+        names = [os.path.basename(n.strip()) for n in (filenames or []) if n and n.strip()]
         if len(names) != 1:
             return result
 
         filename = names[0]
         resolved_doc_id = (doc_id or "").strip()
-        summary_text = result.get("summary") or ""
-        sources = result.get("sources") or []
+        summary_text = result["summary"]
+        sources = result.get("sources", [])
         try:
             saved = await self._history_store.insert_document_summary(
                 chat_id=session_id,
