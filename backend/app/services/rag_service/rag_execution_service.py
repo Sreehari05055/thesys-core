@@ -73,8 +73,10 @@ class RAGExecutionService:
                 "sources": [],
             }
         queries = queries or [user_query]
-        chunks_a = await self._chunks_for_doc(queries, user_query, session_id, search_params, doc_ids[0])
-        chunks_b = await self._chunks_for_doc(queries, user_query, session_id, search_params, doc_ids[1])
+        chunks_a, chunks_b = await asyncio.gather(
+            self._chunks_for_doc(queries, user_query, session_id, search_params, doc_ids[0]),
+            self._chunks_for_doc(queries, user_query, session_id, search_params, doc_ids[1]),
+        )
         if not chunks_a or not chunks_b:
             return {
                 "type": "compare_research",
