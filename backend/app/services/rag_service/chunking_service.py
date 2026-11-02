@@ -41,9 +41,14 @@ class ChunkingService:
         self.SMALL_CHUNK_MAX_TOKENS = self.CHUNK_SIZE // 4
         self.SEP = " "
 
+    def _piece_tokens(self, text: str, *, leading_sep: bool) -> int:
+        if not text:
+            return 0
+        return tokenizer_manager.count_tokens((self.SEP + text) if leading_sep else text)
+
     def chunk_pdf_elements(self, pdf_page_data: dict, doc_id: str, doc_title: str) -> List[dict]:
         parents = []
-        buf = {"content": [], "bboxes": [], "pages": set(), "lines": []}
+        buf = {"content": [], "bboxes": [], "pages": set(), "lines": [], "tokens": 0}
         in_refs = False
 
         def reset():
@@ -51,10 +56,7 @@ class ChunkingService:
             buf["bboxes"].clear()
             buf["pages"].clear()
             buf["lines"].clear()
-
-        def ntok(parts):
-            text = self.SEP.join(parts)
-            return tokenizer_manager.count_tokens(text) if text else 0
+            buf["tokens"] = 0
 
         def flush(into_last=False):
             if not buf["content"]:
@@ -134,11 +136,14 @@ class ChunkingService:
                     flush()
                     in_refs = False
 
-                if buf["content"] and ntok(buf["content"] + [text]) > self.CHUNK_SIZE:
+                extra = self._piece_tokens(text, leading_sep=bool(buf["content"]))
+                if buf["content"] and buf["tokens"] + extra > self.CHUNK_SIZE:
                     flush()
+                    extra = self._piece_tokens(text, leading_sep=False)
                 buf["content"].append(text)
+                buf["tokens"] += extra
                 add(element, page_no, bbox, page_dims, tag)
-                if ntok(buf["content"]) > self.CHUNK_SIZE:
+                if buf["tokens"] > self.CHUNK_SIZE:
                     flush()
 
         flush()
@@ -176,18 +181,23 @@ class ChunkingService:
 
     def _pack_lines(self, lines: list) -> list:
         groups, texts, boxes, pages = [], [], [], set()
+        tokens = 0
         def emit():
+            nonlocal tokens
             if not texts:
                 return
             groups.append({"text": self.SEP.join(texts), "bboxes": list(boxes), "pages": sorted(pages)})
             texts.clear()
             boxes.clear()
             pages.clear()
+            tokens = 0
         for line in lines:
-            nxt = texts + [line["text"]]
-            if texts and tokenizer_manager.count_tokens(self.SEP.join(nxt)) > self.CHILD_CHUNK_SIZE:
+            extra = self._piece_tokens(line["text"], leading_sep=bool(texts))
+            if texts and tokens + extra > self.CHILD_CHUNK_SIZE:
                 emit()
+                extra = self._piece_tokens(line["text"], leading_sep=False)
             texts.append(line["text"])
+            tokens += extra
             boxes.append(_paint(line))
             pages.add(line["page"])
         emit()
@@ -195,6 +205,7 @@ class ChunkingService:
 
     def _to_children(self, parents: list, doc_id: str, doc_title: str) -> list:
         rows = []
+        child_i = 0
         for idx, parent in enumerate(parents):
             text = parent["content"].strip()
             if not text:
@@ -202,6 +213,20 @@ class ChunkingService:
             meta = parent["metadata"]
             lines = parent.get("lines") or []
             parent_boxes = meta.get("bboxes") or []
+            parent_id = f"{doc_id}_p{idx}"
+            parent_meta = {
+                "title": doc_title,
+                "file_type": "pdf",
+                "pages": meta.get("pages") or [],
+                "bboxes": parent_boxes,
+                "role": "parent",
+            }
+            if meta.get("reference_section"):
+                parent_meta["reference_section"] = True
+            if meta.get("tag"):
+                parent_meta["tag"] = meta["tag"]
+            rows.append({"id": parent_id, "content": text, "metadata": parent_meta})
+
             keep = (
                 tokenizer_manager.count_tokens(text) <= self.CHILD_CHUNK_SIZE
                 or meta.get("tag") in ("table", "code", "picture", "chart")
@@ -217,8 +242,8 @@ class ChunkingService:
                     "file_type": "pdf",
                     "pages": g["pages"],
                     "bboxes": g["bboxes"],
-                    "parent_id": f"{doc_id}_p{idx}",
-                    "parent_text": text,
+                    "role": "child",
+                    "parent_id": parent_id,
                     "parent_pages": meta.get("pages") or [],
                     "parent_bboxes": parent_boxes,
                 }
@@ -226,5 +251,6 @@ class ChunkingService:
                     row["reference_section"] = True
                 if meta.get("tag"):
                     row["tag"] = meta["tag"]
-                rows.append({"content": g["text"], "metadata": row})
+                rows.append({"id": f"{doc_id}_c{child_i}", "content": g["text"], "metadata": row})
+                child_i += 1
         return rows
