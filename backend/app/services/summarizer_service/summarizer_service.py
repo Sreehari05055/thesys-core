@@ -73,13 +73,13 @@ class SummarizerService:
             seen_ids.add(chunk_id)
             sources.append(
                 {
-                    "content": row.get("text") or "",
+                    "content": row["text"],
                     "id": chunk_id,
-                    "doc_id": row.get("doc_id") or "",
-                    "filename": row.get("filename") or "",
-                    "title": row.get("title") or "",
-                    "pages": row.get("pages") or [],
-                    "bboxes": row.get("bboxes") or [],
+                    "doc_id": row["doc_id"],
+                    "filename": row["filename"],
+                    "title": row["title"],
+                    "pages": row["pages"],
+                    "bboxes": row["bboxes"],
                     "reference_section": False,
                 }
             )
@@ -87,9 +87,9 @@ class SummarizerService:
 
     @staticmethod
     def _chunk_sort_key(row: dict) -> tuple:
-        pages = row.get("pages") or []
+        pages = row["pages"]
         first_page = min(pages) if pages else 0
-        return (first_page, row.get("chunk_id") or "")
+        return (first_page, row["chunk_id"])
 
     @staticmethod
     def _join_extractions(rows: List[dict], extractions: List[str]) -> str:
@@ -99,13 +99,11 @@ class SummarizerService:
             text = (raw or "").strip()
             if not text:
                 continue
-            chunk_id = row["chunk_id"]
-            title = row.get("title") or row.get("filename") or ""
-            pages = row.get("pages") or []
+            pages = row["pages"]
             page_label = ", ".join(str(p) for p in pages) if pages else "?"
             blocks.append(
-                f"Source ID: [{chunk_id}]\n"
-                f"Title: {title} (Pages {page_label})\n"
+                f"Source ID: [{row['chunk_id']}]\n"
+                f"Title: {row['title'] or row['filename']} (Pages {page_label})\n"
                 f"EXTRACTION:\n{text}"
             )
         return "\n\n---\n\n".join(blocks)
@@ -154,4 +152,4 @@ class SummarizerService:
             return self._response_content_to_str(response.content)
         except Exception as e:
             logger.error(f"Error synthesizing paper summary: {e}", exc_info=True)
-            return ""
+            raise
