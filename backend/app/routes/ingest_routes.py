@@ -69,7 +69,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
 
             files = await history_store.list_rag_files(sid)
             for f in files:
-                name = os.path.basename(str(f.get("filename") or f.get("file_name") or "").strip())
+                name = os.path.basename(str(f.get("filename") or "").strip())
                 f["filename"] = name
                 f["doc_id"] = _doc_id_for_filename(name)
                 f["metadata"] = {
@@ -97,8 +97,9 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
             offline = bool(session_settings.get("offline"))
 
             if ctype == "application/json":
+                payload = await request.json()
                 sources = [
-                    s for s in (await request.json()).get("sources") or []
+                    s for s in (payload.get("sources") or [])
                     if (s.get("url") or "").strip()
                 ]
                 for s in sources:
