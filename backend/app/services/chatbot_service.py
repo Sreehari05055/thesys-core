@@ -2,6 +2,7 @@ import json
 import re
 from typing import AsyncGenerator, List, Dict, Any
 from app import logger
+from app.core.config import config
 from app.services.langchain_handler.langchain_service import LangChainService
 from app.services.langchain_handler.tool_definitions import CompareResearch, FetchResearch, get_tool_schemas
 from app.services.session_title_service import SessionTitleService
@@ -32,6 +33,16 @@ class ChatbotService:
         if research_mode:
             return [FetchResearch]
         return [t for t in self.tools if t.__name__ not in blocked_tools]
+
+    @staticmethod
+    def _last_n_turns(stored_messages: List[Dict[str, Any]], n: int) -> List[Dict[str, Any]]:
+        """Keep the last ``n`` turns. One turn = a user message and everything until the next user."""
+        if n <= 0:
+            return stored_messages
+        user_idxs = [i for i, m in enumerate(stored_messages) if m.get("role") == "user"]
+        if len(user_idxs) <= n:
+            return stored_messages
+        return stored_messages[user_idxs[-n]:]
 
     def _convert_to_langchain_messages(self, stored_messages: List[Dict[str, Any]]) -> List[BaseMessage]:
         """Convert stored JSON messages to LangChain Message objects."""
@@ -235,7 +246,8 @@ class ChatbotService:
                 if research_mode
                 else self.system_prompt
             )
-            lc_messages = [SystemMessage(content=system_prompt)] + self._convert_to_langchain_messages(stored_msgs)
+            history = self._last_n_turns(stored_msgs, config.MAX_CONVERSATION_TURNS)
+            lc_messages = [SystemMessage(content=system_prompt)] + self._convert_to_langchain_messages(history)
             if active_documents:
                 augmented_query = self._augment_query_with_active_scope(
                     query, active_documents, previous_active_documents
