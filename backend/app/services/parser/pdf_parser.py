@@ -42,8 +42,8 @@ def clean_for_embeddings(text: str) -> str:
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     return cleaned.strip()
 
-@lru_cache(maxsize=1)
-def _build_converter() -> DocumentConverter:
+@lru_cache(maxsize=2)
+def _build_converter(offline: bool = False) -> DocumentConverter:
     accel = AcceleratorOptions(
         device=AcceleratorDevice.AUTO,
         num_threads=max(1, os.cpu_count() or 4),
@@ -57,22 +57,23 @@ def _build_converter() -> DocumentConverter:
     if config.DO_OCR:
         opts.ocr_options = RapidOcrOptions(backend="onnxruntime", lang=["english"])
     opts.table_structure_options.mode = TableFormerMode.ACCURATE
-    opts.do_picture_description = True
-    opts.enable_remote_services = True
-    opts.picture_description_options = PictureDescriptionApiOptions(
-        url=AnyUrl("https://api.openai.com/v1/chat/completions"),
-        headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
-        params={
-            "model": "gpt-6-luna",
-            "reasoning_effort": "low",
-        },
-        timeout=60.0,
-        prompt=(
-        "Describe this paper figure for search. Cover the figure type "
-        "(plot, diagram, photo, schematic), axes/labels, what is shown, "
-        "and any numbers or conclusions visible. Skip decorative chrome."
-        ), 
-    )
+    if not offline:
+        opts.do_picture_description = True
+        opts.enable_remote_services = True
+        opts.picture_description_options = PictureDescriptionApiOptions(
+            url=AnyUrl("https://api.openai.com/v1/chat/completions"),
+            headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
+            params={
+                "model": "gpt-6-luna",
+                "reasoning_effort": "low",
+            },
+            timeout=60.0,
+            prompt=(
+            "Describe this paper figure for search. Cover the figure type "
+            "(plot, diagram, photo, schematic), axes/labels, what is shown, "
+            "and any numbers or conclusions visible. Skip decorative chrome."
+            ),
+        )
 
     return DocumentConverter(
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
@@ -82,8 +83,8 @@ class PDFExtractor:
     """Extract PDF structure via Docling (reading order, tags, table markdown)."""
 
     @staticmethod
-    def _converter() -> DocumentConverter:
-        return _build_converter()
+    def _converter(offline: bool = False) -> DocumentConverter:
+        return _build_converter(offline)
 
     @staticmethod
     def _caption_refs_to_skip(doc) -> set[str]:
@@ -229,7 +230,7 @@ class PDFExtractor:
             "page": page_no,
         }
 
-    def extract(self, filepath):
+    def extract(self, filepath, offline: bool = False):
         try:
             logger.info("Extracting PDF with Docling: %s", filepath)
             doc_title = os.path.basename(filepath)
@@ -239,7 +240,7 @@ class PDFExtractor:
             if max_pages > 0:
                 kwargs["page_range"] = (1, max_pages)
 
-            result = self._converter().convert(filepath, **kwargs)
+            result = self._converter(offline).convert(filepath, **kwargs)
             doc = result.document
             skip_caption_refs = self._caption_refs_to_skip(doc)
 
