@@ -76,6 +76,16 @@ def _pdf_docs_to_nodes(pdf_docs, session_id: str) -> list:
     return nodes
 
 
+def _where_values(key: str, values: list[str]) -> dict | None:
+    """Chroma metadata filter. One value is equality; several is ``$in``."""
+    uniq = list(dict.fromkeys(v for v in values if v))
+    if not uniq:
+        return None
+    if len(uniq) == 1:
+        return {key: uniq[0]}
+    return {key: {"$in": uniq}}
+
+
 def _region_from_row(node_id, text, meta_raw) -> dict | None:
     """Map a table/code chunk to a reader overlay region."""
     meta = meta_raw if isinstance(meta_raw, dict) else {}
@@ -161,9 +171,9 @@ class LocalRAGPipeline(BaseRAGPipeline):
             return
         BaseRAGPipeline.session_indices[session_id] = self._fresh_index(session_id)
 
-    async def _add_to_index(self, session_id: str, file_paths: List[str]):
+    async def _add_to_index(self, session_id: str, file_paths: List[str], offline: bool = False):
         nodes = _pdf_docs_to_nodes(
-            list(iter_documents(self._files_dir(session_id), file_paths)),
+            list(iter_documents(self._files_dir(session_id), file_paths, offline=offline)),
             session_id,
         )
         index = self._fresh_index(session_id)
@@ -212,15 +222,16 @@ class LocalRAGPipeline(BaseRAGPipeline):
     async def fetch_texts_for_summarizer(
         self, session_id: str, filenames: list | None = None
     ) -> list:
-        data = self._collection(session_id).get(include=["documents", "metadatas"])
-        wanted = set(filenames) if filenames else None
+        where = _where_values("filename", list(filenames or []))
+        get_kwargs = {"include": ["documents", "metadatas"]}
+        if where:
+            get_kwargs["where"] = where
+        data = self._collection(session_id).get(**get_kwargs)
         rows = []
         seen_parents = set()
         for nid, text, meta in zip(data["ids"], data["documents"], data["metadatas"]):
             meta = meta or {}
             if meta.get("reference_section"):
-                continue
-            if wanted and (meta.get("filename") or meta.get("title")) not in wanted:
                 continue
             parent_id = meta.get("parent_id") or nid
             if parent_id in seen_parents:
@@ -239,13 +250,13 @@ class LocalRAGPipeline(BaseRAGPipeline):
 
     async def fetch_file_regions(self, session_id: str, doc_id: str) -> List[dict[str, Any]]:
         needle = unquote(doc_id or "").strip().lower()
-        data = self._collection(session_id).get(include=["documents", "metadatas"])
+        data = self._collection(session_id).get(
+            where={"doc_id": needle},
+            include=["documents", "metadatas"],
+        )
         regions = []
         for nid, text, meta in zip(data["ids"], data["documents"], data["metadatas"]):
-            meta = meta or {}
-            if (meta.get("doc_id") or "").strip().lower() != needle:
-                continue
-            region = _region_from_row(nid, text, meta)
+            region = _region_from_row(nid, text, meta or {})
             if region:
                 regions.append(region)
         regions.sort(key=lambda r: (r.get("page") or 0, r.get("id") or ""))
