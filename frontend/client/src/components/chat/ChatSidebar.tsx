@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import type { ChatPageModel } from "@/hooks/useChatPage";
 import { SiteLogo, WeaveLogoIcon } from "@/components/WeaveLogo";
+import { SessionModeDialog } from "@/components/chat/SessionModeDialog";
 import { SITE_NAME } from "@/lib/siteMeta";
 import { cn } from "@/lib/utils";
 
@@ -60,11 +61,36 @@ function BookmarkSimpleIcon({ size = 14, className }: { size?: number; className
   );
 }
 
+function WithoutAiSessionIcon({ size = 13, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn("block shrink-0", className)}
+      aria-hidden
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3-3" />
+    </svg>
+  );
+}
+
 export function ChatSidebar({ model }: ChatSidebarProps) {
   const {
     sidebarOpen,
     setSidebarOpen,
+    openNewChatDialog,
     createNewChat,
+    modeDialogOpen,
+    setModeDialogOpen,
+    creatingChat,
+    openaiConfigured,
     chats,
     activeChatId,
     switchChat,
@@ -148,7 +174,7 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
         <div className="px-3 pt-3 pb-2 shrink-0">
           <button
             type="button"
-            onClick={createNewChat}
+            onClick={openNewChatDialog}
             className="w-full flex items-center gap-2 rounded-md border border-primary/20 bg-primary/8 text-primary hover:bg-primary/14 hover:border-primary/35 transition-all font-semibold px-3 py-2 text-[13px]"
             data-testid="button-new-chat"
           >
@@ -231,8 +257,20 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
                     onClick={() => switchChat(chat.id)}
                     data-testid={`chat-item-${chat.id}`}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-[13px] truncate leading-snug ${isActive ? "text-foreground font-medium" : "text-foreground/65"}`}>
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      {chat.offline ? (
+                        <span
+                          className="shrink-0 text-muted-foreground/80"
+                          title="Without AI"
+                          aria-label="Without AI"
+                          data-testid={`icon-offline-session-${chat.id}`}
+                        >
+                          <WithoutAiSessionIcon />
+                        </span>
+                      ) : null}
+                      <div
+                        className={`min-w-0 truncate text-[13px] leading-snug ${isActive ? "text-foreground font-medium" : "text-foreground/65"}`}
+                      >
                         {chat.title}
                       </div>
                     </div>
@@ -292,6 +330,16 @@ export function ChatSidebar({ model }: ChatSidebarProps) {
       ) : (
         <div className="flex-1" aria-hidden />
       )}
+
+      <SessionModeDialog
+        open={modeDialogOpen}
+        openaiConfigured={openaiConfigured}
+        creating={creatingChat}
+        onClose={() => setModeDialogOpen(false)}
+        onChoose={(offline) => {
+          void createNewChat(offline);
+        }}
+      />
 
       {/* Delete dialog */}
       {pendingDeleteChat && (
