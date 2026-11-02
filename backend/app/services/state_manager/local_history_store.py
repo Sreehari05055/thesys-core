@@ -57,17 +57,21 @@ class LocalHistoryStore(BaseHistoryStore):
         os.makedirs(directory, exist_ok=True)
         return os.path.join(directory, os.path.basename(filename))
 
-    async def create_session(self, user_id=None) -> str:
-        return await self._run(self._create_session)
+    async def create_session(self, user_id=None, offline: bool = False) -> str:
+        return await self._run(self._create_session, offline)
 
-    def _create_session(self) -> str:
+    def _create_session(self, offline: bool = False) -> str:
         chat_id = str(uuid.uuid4())
         row = self._conn.execute(
             "SELECT provider, model FROM llm_models WHERE is_default = 1 AND is_active = 1"
         ).fetchone()
         if not row:
             raise RuntimeError("No default active LLM in llm_models")
-        config = json.dumps({"provider": row["provider"], "model": row["model"]})
+        config = json.dumps({
+            "provider": row["provider"],
+            "model": row["model"],
+            "offline": bool(offline),
+        })
         self._conn.execute("INSERT INTO chats (id, config) VALUES (?, ?)", (chat_id, config))
         self._conn.commit()
         return chat_id
@@ -77,9 +81,18 @@ class LocalHistoryStore(BaseHistoryStore):
 
     def _list_sessions(self) -> list[dict]:
         rows = self._conn.execute(
-            "SELECT id, title, created_at, updated_at FROM chats ORDER BY updated_at DESC"
+            "SELECT id, title, config, created_at, updated_at FROM chats ORDER BY updated_at DESC"
         ).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            item = dict(r)
+            try:
+                cfg = json.loads(item.pop("config") or "{}")
+            except Exception:
+                cfg = {}
+            item["offline"] = bool(cfg.get("offline"))
+            out.append(item)
+        return out
 
     async def get_session_title(self, session_id: str) -> str:
         return await self._run(self._get_session_title, session_id)
@@ -132,7 +145,9 @@ class LocalHistoryStore(BaseHistoryStore):
         merged = json.loads(
             self._conn.execute("SELECT config FROM chats WHERE id = ?", (session_id,)).fetchone()["config"]
         )
-        merged.update(settings)
+        patch = dict(settings)
+        patch.pop("offline", None)
+        merged.update(patch)
         self._conn.execute(
             "UPDATE chats SET config = ?, updated_at = ? WHERE id = ?",
             (json.dumps(merged), _now(), session_id),
@@ -151,72 +166,73 @@ class LocalHistoryStore(BaseHistoryStore):
             return None
         return {"provider": row["provider"], "name": row["model"]}
 
-    async def get_messages(self, session_id: str) -> list[dict]:
-        return await self._run(self._get_messages, session_id)
+    async def get_messages(self, session_id: str, include_sources: bool = True) -> list[dict]:
+        return await self._run(self._get_messages, session_id, include_sources)
 
-    def _get_messages(self, session_id: str) -> list[dict]:
+    def _get_messages(self, session_id: str, include_sources: bool = True) -> list[dict]:
         rows = self._conn.execute(
             "SELECT id, role, content, tool_calls, tool_call_id, name FROM messages "
             "WHERE chat_id = ? ORDER BY rowid",
             (session_id,),
         ).fetchall()
         sources_by_msg: dict[str, list] = {}
-        for src in self._conn.execute(
-            "SELECT message_id, chunk_id, doc_id, title, pages, bbox, precise_bbox, score, content, "
-            "pair_id, choice, side FROM sources WHERE chat_id = ? ORDER BY rowid",
-            (session_id,),
-        ):
-            chunk = {
-                "id": src["chunk_id"],
-                "doc_id": src["doc_id"],
-                "title": src["title"],
-                "pages": json.loads(src["pages"]) if src["pages"] else [],
-                "bboxes": json.loads(src["bbox"]) if src["bbox"] else [],
-                "precise_bboxes": json.loads(src["precise_bbox"]) if src["precise_bbox"] else [],
-                "score": src["score"],
-                "content": src["content"],
-            }
-            bucket = sources_by_msg.setdefault(src["message_id"], [])
-            if not src["pair_id"]:
-                bucket.append(chunk)
-                continue
-            pair = next((p for p in bucket if p.get("pair_id") == src["pair_id"]), None)
-            if pair is None:
-                pair = {
-                    "pair_id": src["pair_id"],
-                    "choice": src["choice"] or "",
-                    "confidence": src["score"] or 0,
-                    "chunk_a": None,
-                    "chunk_b": None,
-                }
-                bucket.append(pair)
-            pair["chunk_a" if src["side"] != "b" else "chunk_b"] = chunk
-            if src["score"] is not None:
-                pair["confidence"] = src["score"]
-
         papers_by_msg: dict[str, list] = {}
-        for paper in self._conn.execute(
-            "SELECT message_id, paper_id, title, authors, publication_year, doi, abstract, "
-            "is_open_access, pdf_verified, pdf_url, landing_page_url, cited_by_count, rerank_score "
-            "FROM external_papers WHERE chat_id = ?",
-            (session_id,),
-        ):
-            item = {
-                "id": paper["paper_id"],
-                "title": paper["title"],
-                "authors": paper["authors"],
-                "publication_year": paper["publication_year"],
-                "doi": paper["doi"],
-                "abstract": paper["abstract"],
-                "is_open_access": bool(paper["is_open_access"]),
-                "pdf_url": paper["pdf_url"],
-                "landing_page_url": paper["landing_page_url"],
-            }
-            if paper["cited_by_count"] is not None:
-                item["cited_by_count"] = paper["cited_by_count"]
-            if paper["rerank_score"] is not None:
-                item["rerank_score"] = paper["rerank_score"]
-            papers_by_msg.setdefault(paper["message_id"], []).append(item)
+        if include_sources:
+            for src in self._conn.execute(
+                "SELECT message_id, chunk_id, doc_id, title, pages, bbox, precise_bbox, score, content, "
+                "pair_id, choice, side FROM sources WHERE chat_id = ? ORDER BY rowid",
+                (session_id,),
+            ):
+                chunk = {
+                    "id": src["chunk_id"],
+                    "doc_id": src["doc_id"],
+                    "title": src["title"],
+                    "pages": json.loads(src["pages"]) if src["pages"] else [],
+                    "bboxes": json.loads(src["bbox"]) if src["bbox"] else [],
+                    "precise_bboxes": json.loads(src["precise_bbox"]) if src["precise_bbox"] else [],
+                    "score": src["score"],
+                    "content": src["content"],
+                }
+                bucket = sources_by_msg.setdefault(src["message_id"], [])
+                if not src["pair_id"]:
+                    bucket.append(chunk)
+                    continue
+                pair = next((p for p in bucket if p.get("pair_id") == src["pair_id"]), None)
+                if pair is None:
+                    pair = {
+                        "pair_id": src["pair_id"],
+                        "choice": src["choice"] or "",
+                        "confidence": src["score"] or 0,
+                        "chunk_a": None,
+                        "chunk_b": None,
+                    }
+                    bucket.append(pair)
+                pair["chunk_a" if src["side"] != "b" else "chunk_b"] = chunk
+                if src["score"] is not None:
+                    pair["confidence"] = src["score"]
+
+            for paper in self._conn.execute(
+                "SELECT message_id, paper_id, title, authors, publication_year, doi, abstract, "
+                "is_open_access, pdf_verified, pdf_url, landing_page_url, cited_by_count, rerank_score "
+                "FROM external_papers WHERE chat_id = ?",
+                (session_id,),
+            ):
+                item = {
+                    "id": paper["paper_id"],
+                    "title": paper["title"],
+                    "authors": paper["authors"],
+                    "publication_year": paper["publication_year"],
+                    "doi": paper["doi"],
+                    "abstract": paper["abstract"],
+                    "is_open_access": bool(paper["is_open_access"]),
+                    "pdf_url": paper["pdf_url"],
+                    "landing_page_url": paper["landing_page_url"],
+                }
+                if paper["cited_by_count"] is not None:
+                    item["cited_by_count"] = paper["cited_by_count"]
+                if paper["rerank_score"] is not None:
+                    item["rerank_score"] = paper["rerank_score"]
+                papers_by_msg.setdefault(paper["message_id"], []).append(item)
 
         messages = []
         for row in rows:
@@ -277,10 +293,10 @@ class LocalHistoryStore(BaseHistoryStore):
                     src.get("doc_id") or "",
                     src.get("title"),
                     _dumps(src.get("pages")),
-                    _dumps(src.get("bbox") or src.get("bboxes")),
-                    _dumps(src.get("precise_bbox") or src.get("precise_bboxes")),
+                    _dumps(src.get("bboxes")),
+                    _dumps(src.get("precise_bboxes")),
                     src.get("score"),
-                    src.get("content") or src.get("text"),
+                    src.get("content"),
                     src.get("pair_id"),
                     src.get("choice"),
                     src.get("side"),

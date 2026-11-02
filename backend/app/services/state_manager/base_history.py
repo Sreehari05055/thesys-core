@@ -12,8 +12,10 @@ class DocIdNotFoundError(LookupError):
 
 class BaseHistoryStore(ABC):
     @abstractmethod
-    async def get_messages(self, session_id: str) -> List[Dict[str, Any]]:
-        """Retrieve all messages for a specific session."""
+    async def get_messages(
+        self, session_id: str, include_sources: bool = True
+    ) -> List[Dict[str, Any]]:
+        """Retrieve messages for a session. Set include_sources=False for LLM prompt path."""
         pass
 
     @abstractmethod
@@ -38,7 +40,7 @@ class BaseHistoryStore(ABC):
         pass
     
     @abstractmethod
-    async def create_session(self, user_id: Optional[str] = None) -> str:
+    async def create_session(self, user_id: Optional[str] = None, offline: bool = False) -> str:
         """Create a new session, optionally bound to a user. Returns the session_id."""
         pass
 
