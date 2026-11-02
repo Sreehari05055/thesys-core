@@ -5,7 +5,7 @@ from app import logger
 
 _PARSERS = {".pdf": PDFExtractor()}
 
-def iter_documents(data_dir: str, file_paths: list = None):
+def iter_documents(data_dir: str, file_paths: list = None, offline: bool = False):
     """Parse files into indexer-ready dicts. ``file_paths`` limits the scan; ``None`` walks ``data_dir``."""
     paths = (
         file_paths
@@ -20,7 +20,7 @@ def iter_documents(data_dir: str, file_paths: list = None):
             continue
 
         try:
-            raw_data = parser.extract(filepath)
+            raw_data = parser.extract(filepath, offline=offline)
             if not raw_data:
                 continue
 
@@ -31,7 +31,7 @@ def iter_documents(data_dir: str, file_paths: list = None):
                 "page_data": raw_data["page_data"],
                 "metadata": {
                     **raw_meta,
-                    "filename": raw_meta.get("filename") or filename,
+                    "filename": filename,
                 },
             }
         except Exception as e:
