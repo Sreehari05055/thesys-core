@@ -1,8 +1,7 @@
 import asyncio
+import re
 from typing import Optional
-
 from langchain_core.messages import HumanMessage, SystemMessage
-
 from app import logger
 from app.core.config import config
 from app.prompts.prompts import get_session_title_prompt
@@ -10,7 +9,7 @@ from app.services.langchain_handler.langchain_service import LangChainService
 
 
 class SessionTitleService:
-    """LLM title from the first user message; persistence + cleanup live in the history store."""
+    """First-message title: query text when offline, LLM when online."""
 
     async def generate_and_set_first_title(
         self,
@@ -20,11 +19,19 @@ class SessionTitleService:
         *,
         provider: Optional[str] = None,
         model_name: Optional[str] = None,
+        offline: bool = False,
     ) -> Optional[str]:
+        text = (first_message or "").strip()
+        if offline:
+            title = re.sub(r"\s+", " ", text)[:80].strip()
+            saved = await store.set_title_if_default(session_id, title)
+            if saved:
+                logger.info("Set offline session title for %s: %s", session_id, saved)
+            return saved
+
         provider = (provider or "").strip()
         model_name = (model_name or "").strip()
-        text = (first_message or "").strip()
-        if not provider or not model_name or not text:
+        if not provider or not model_name:
             return None
 
         try:
