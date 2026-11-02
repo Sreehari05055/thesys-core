@@ -18,6 +18,8 @@ type ChatSourcesPopoverProps = {
   onCite: (file: IngestedFile) => void;
   onDelete: (file: IngestedFile) => void;
   deletingFilename: string | null;
+  /** Without-AI sessions cannot generate summaries. */
+  summarizeDisabled?: boolean;
   triggerClassName?: string;
 };
 
@@ -69,6 +71,7 @@ export function ChatSourcesPopover({
   onCite,
   onDelete,
   deletingFilename,
+  summarizeDisabled = false,
   triggerClassName,
 }: ChatSourcesPopoverProps) {
   const [open, setOpen] = useState(false);
@@ -314,19 +317,21 @@ export function ChatSourcesPopover({
           <div className="mt-3 border-t border-border pt-3">
             <button
               type="button"
-              disabled={!canUseSoleSelectedFile}
+              disabled={summarizeDisabled || !canUseSoleSelectedFile}
               onClick={() => {
-                if (!canUseSoleSelectedFile || !soleSelectedFile) return;
+                if (summarizeDisabled || !canUseSoleSelectedFile || !soleSelectedFile) return;
                 setOpen(false);
                 setSummarizeConfirmFile(soleSelectedFile);
               }}
               className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               title={
-                canUseSoleSelectedFile
-                  ? "Generate a full summary (uses usage quota)"
-                  : selectedCount > 1
-                    ? "Check exactly one paper to summarize"
-                    : "Check one paper above to enable summarization"
+                summarizeDisabled
+                  ? "Summaries need AI — unavailable in Without AI sessions"
+                  : canUseSoleSelectedFile
+                    ? "Generate a full summary (uses usage quota)"
+                    : selectedCount > 1
+                      ? "Check exactly one paper to summarize"
+                      : "Check one paper above to enable summarization"
               }
               data-testid="button-popover-summarize"
             >
