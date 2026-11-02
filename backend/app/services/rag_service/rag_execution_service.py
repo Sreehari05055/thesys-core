@@ -1,12 +1,13 @@
+import asyncio
 from app import logger
 from typing import Any, Dict, List
 from app.core.config import config
 from app.services.jev_service import classify_pairs
 
 
-def _chunk_without_embedding(chunk: Dict[str, Any]) -> Dict[str, Any]:
-    """Drop vector / internal keys from a corpus chunk dict."""
-    return {k: v for k, v in chunk.items() if k not in ("embedding", "parent_id")}
+def _public_chunk(chunk: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop internal keys from a corpus chunk dict."""
+    return {k: v for k, v in chunk.items() if k != "parent_id"}
 
 
 class RAGExecutionService:
@@ -21,19 +22,16 @@ class RAGExecutionService:
         """Full wipe and rebuild of the index for a specific session."""
         await self.rag_pipeline._build_index(session_id)
 
-    async def add_to_index(self, session_id: str, file_paths: list[str]):
+    async def add_to_index(self, session_id: str, file_paths: list[str], offline: bool = False):
         """Incrementally add new files to an existing index without rebuilding."""
-        await self.rag_pipeline._add_to_index(session_id, file_paths)
+        await self.rag_pipeline._add_to_index(session_id, file_paths, offline=offline)
 
     async def clear_session_vectors(self, session_id: str) -> None:
-        """Delete all embedding rows for a session (no-op if pipeline lacks delete support)."""
-        if self.rag_pipeline and hasattr(self.rag_pipeline, "delete_session_vectors"):
-            await self.rag_pipeline.delete_session_vectors(session_id)
+        """Delete all embedding rows for a session."""
+        await self.rag_pipeline.delete_session_vectors(session_id)
 
     async def fetch_file_regions(self, session_id: str, doc_id: str) -> List[Dict[str, Any]]:
-        if self.rag_pipeline and hasattr(self.rag_pipeline, "fetch_file_regions"):
-            return await self.rag_pipeline.fetch_file_regions(session_id, doc_id)
-        return []
+        return await self.rag_pipeline.fetch_file_regions(session_id, doc_id)
 
     @staticmethod
     def format_context(context_list: List[dict]) -> str:
@@ -56,7 +54,7 @@ class RAGExecutionService:
     async def get_info(self, queries: list[str], user_query: str, session_id: str, search_params=None):
         logger.info(f"Fetching quick knowledge for session {session_id} using keywords: {queries}")
         context_list = await self.rag_pipeline._get_corpus_data(queries, user_query, session_id, search_params=search_params)
-        sources = [_chunk_without_embedding(c) for c in context_list]
+        sources = [_public_chunk(c) for c in context_list]
         return {
             "type": "search_research",
             "context_text": self.format_context(context_list),
@@ -106,12 +104,12 @@ class RAGExecutionService:
             {
                 "choice": ans["choice"],
                 "confidence": ans["confidence"],
-                "chunk_a": _chunk_without_embedding(a),
-                "chunk_b": _chunk_without_embedding(b),
+                "chunk_a": _public_chunk(a),
+                "chunk_b": _public_chunk(b),
             }
             for a, b, ans in kept
         ]
-        unique = [_chunk_without_embedding(c) for c in used.values()]
+        unique = [_public_chunk(c) for c in used.values()]
         lines = []
         if unique:
             lines.append(self.format_context(unique))
