@@ -36,7 +36,7 @@ import {
   mergeLoadedConversationMessages,
   streamingTurnMessages,
 } from "@/lib/conversationApi";
-import { buildConversationSourceIndex, collectCitedConversationSources, collectCompareRelations, appendPendingChatSource, flattenRelationChunks, normalizeChatSources, normalizeCompareRelations, updateLastBotMessage } from "@/lib/chatMessages";
+import { buildConversationSourceIndex, collectCitedConversationSources, collectCompareRelations, collectOfflineQueryTurns, appendPendingChatSource, flattenRelationChunks, normalizeChatSources, normalizeCompareRelations, updateLastBotMessage } from "@/lib/chatMessages";
 import { consumeChatSseStream } from "@/lib/chatStream";
 import { preserveScrollPosition, scrollChatToBottom } from "@/lib/chatScroll";
 import type { RightPanelTab } from "@/types/chat";
@@ -82,6 +82,10 @@ export function useChatPage() {
   // ── Input & loading ──
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [openaiConfigured, setOpenaiConfigured] = useState<boolean | null>(null);
+  const [modeDialogOpen, setModeDialogOpen] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
+  const [selectedOfflineQueryIndex, setSelectedOfflineQueryIndex] = useState<number | null>(null);
 
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
@@ -136,19 +140,36 @@ export function useChatPage() {
   }, [activeChatId, deletedSourceIdsByChat]);
   const sourcesIndexReady = activeChatId ? Boolean(sourcesIndexReadyByChat[activeChatId]) : false;
 
-  // LLM-cited source IDs shown in the Sources panel (not every backend retrieval).
-  const panelSources = useMemo(
-    () => collectCitedConversationSources(messages),
-    [messages],
+  const offlineMode = Boolean(activeChat?.offline);
+  const offlineQueryTurns = useMemo(
+    () => (offlineMode ? collectOfflineQueryTurns(messages) : []),
+    [offlineMode, messages],
   );
+
+  // LLM-cited sources normally; offline shows sources for the selected query turn.
+  const panelSources = useMemo(() => {
+    if (!offlineMode) return collectCitedConversationSources(messages);
+    if (offlineQueryTurns.length === 0) return [];
+    const idx =
+      selectedOfflineQueryIndex != null &&
+      selectedOfflineQueryIndex >= 0 &&
+      selectedOfflineQueryIndex < offlineQueryTurns.length
+        ? selectedOfflineQueryIndex
+        : offlineQueryTurns.length - 1;
+    return offlineQueryTurns[idx]?.sources ?? [];
+  }, [offlineMode, messages, offlineQueryTurns, selectedOfflineQueryIndex]);
   const compareRelations = useMemo(
-    () => collectCompareRelations(messages),
-    [messages],
+    () => (offlineMode ? [] : collectCompareRelations(messages)),
+    [offlineMode, messages],
   );
-  const { knownSourceIds, allSourcesById, globalSourceNumberById } = useMemo(
-    () => buildConversationSourceIndex(messages),
-    [messages],
-  );
+  const { knownSourceIds, allSourcesById, globalSourceNumberById } = useMemo(() => {
+    if (offlineMode) {
+      return buildConversationSourceIndex([
+        { sender: "bot", text: "", sources: panelSources },
+      ]);
+    }
+    return buildConversationSourceIndex(messages);
+  }, [offlineMode, messages, panelSources]);
 
   const selectedChatDocs = useMemo(
     () => activeDocumentsFromIngested(ingestedFiles, selectedChatDocIds),
@@ -174,6 +195,30 @@ export function useChatPage() {
       setShowRightPanelState(false);
     }
   }, [activeChatId, chats]);
+
+  const offlineQueryCountRef = useRef(0);
+  useEffect(() => {
+    setSelectedOfflineQueryIndex(null);
+    offlineQueryCountRef.current = 0;
+  }, [activeChatId]);
+
+  useEffect(() => {
+    if (!offlineMode) return;
+    const len = offlineQueryTurns.length;
+    if (len === 0) {
+      setSelectedOfflineQueryIndex(null);
+      offlineQueryCountRef.current = 0;
+      return;
+    }
+    if (len > offlineQueryCountRef.current) {
+      setSelectedOfflineQueryIndex(len - 1);
+    } else {
+      setSelectedOfflineQueryIndex((prev) =>
+        prev != null && prev >= 0 && prev < len ? prev : len - 1,
+      );
+    }
+    offlineQueryCountRef.current = len;
+  }, [offlineMode, offlineQueryTurns]);
 
   // ── Refs ──
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -211,6 +256,22 @@ export function useChatPage() {
     [openRightPanel],
   );
 
+  const selectOfflineQuery = useCallback(
+    (index: number) => {
+      setSelectedOfflineQueryIndex(index);
+      const turn = offlineQueryTurns[index];
+      if (!turn) return;
+      openRightPanel("sources");
+      if (turn.sources.length > 0) {
+        selectSourceForPreview(turn.sources[0]!, { showPdf: true });
+      } else {
+        setActiveSource(null);
+        setShowPDF(false);
+      }
+    },
+    [offlineQueryTurns, openRightPanel, selectSourceForPreview],
+  );
+
   const selectExternalPaperForPreview = useCallback(
     (paper: ExternalPaper) => {
       setActiveSource(null);
@@ -225,6 +286,23 @@ export function useChatPage() {
     const url = primaryExternalLink(paper);
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(API_URLS.status);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setOpenaiConfigured(data?.openai_configured === true);
+      } catch {
+        // leave unknown
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ── Persist chats ──
@@ -292,6 +370,7 @@ export function useChatPage() {
                 messages: existing?.messages ?? [],
                 lastAccessAt: apiLastAccess ?? existing?.lastAccessAt,
                 createdAt: apiCreatedAt ?? existing?.createdAt ?? Date.now(),
+                offline: session.offline === true || existing?.offline === true,
               };
             })
             .filter((chat): chat is Chat => chat !== null);
@@ -358,45 +437,64 @@ export function useChatPage() {
     setSelectedChatDocIds([]);
   }, []);
 
-  const createNewChat = useCallback(async () => {
-    let sessionId: string;
-    try {
-      const res = await apiFetch(API_URLS.newConversation, { method: "POST" });
-      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
-      const data = await res.json();
-      const id = data.session_id ?? data.sessionId;
-      if (typeof id !== "string" || !id.trim()) throw new Error("Invalid session_id");
-      sessionId = id.trim();
-    } catch (err) {
-      console.error("[createNewChat] /api/conversations/new failed — falling back to local UUID:", err);
-      sessionId = crypto.randomUUID();
-    }
-
-    const newChat: Chat = {
-      id: sessionId,
-      title: "New session",
-      messages: [],
-      createdAt: Date.now(),
-      lastAccessAt: Date.now(),
-      sessionId,
-    };
-
-    setChats((prev) => sortChatsByRecent([newChat, ...prev]));
-    setSidebarView("session");
-    setActiveChatId(sessionId);
-    setActiveSource(null);
-    setActiveExternalPaper(null);
-    setShowRightPanel(false);
-    setShowPDF(false);
-    setUploadMessage(null);
-    setInput("");
-    setLeftPanelMode("chat");
-    setDocumentSummary(null);
-    setSummaryLoading(false);
-    setActiveSummaryTitle("");
-    setActiveSummaryId(null);
-    setSelectedChatDocIds([]);
+  const openNewChatDialog = useCallback(() => {
+    setModeDialogOpen(true);
   }, []);
+
+  const createNewChat = useCallback(
+    async (offline: boolean) => {
+      if (creatingChat) return;
+      setCreatingChat(true);
+      const wantOffline = openaiConfigured === false ? true : offline;
+      let sessionId: string;
+      let sessionOffline = wantOffline;
+      try {
+        const res = await apiFetch(API_URLS.newConversation, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offline: wantOffline }),
+        });
+        if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+        const data = await res.json();
+        const id = data.session_id ?? data.sessionId;
+        if (typeof id !== "string" || !id.trim()) throw new Error("Invalid session_id");
+        sessionId = id.trim();
+        sessionOffline = data.offline === true || wantOffline;
+      } catch (err) {
+        console.error("[createNewChat] /api/conversations/new failed — falling back to local UUID:", err);
+        sessionId = crypto.randomUUID();
+      }
+
+      const newChat: Chat = {
+        id: sessionId,
+        title: "New session",
+        messages: [],
+        createdAt: Date.now(),
+        lastAccessAt: Date.now(),
+        sessionId,
+        offline: sessionOffline,
+      };
+
+      setChats((prev) => sortChatsByRecent([newChat, ...prev]));
+      setSidebarView("session");
+      setActiveChatId(sessionId);
+      setActiveSource(null);
+      setActiveExternalPaper(null);
+      setShowRightPanel(false);
+      setShowPDF(false);
+      setUploadMessage(null);
+      setInput("");
+      setLeftPanelMode("chat");
+      setDocumentSummary(null);
+      setSummaryLoading(false);
+      setActiveSummaryTitle("");
+      setActiveSummaryId(null);
+      setSelectedChatDocIds([]);
+      setModeDialogOpen(false);
+      setCreatingChat(false);
+    },
+    [creatingChat, openaiConfigured],
+  );
 
 
   const deleteChat = useCallback(
@@ -558,7 +656,7 @@ export function useChatPage() {
     const trimmedText = messageText.trim();
     if (loading) return;
     if (!activeChatId) {
-      createNewChat();
+      openNewChatDialog();
       return;
     }
 
@@ -1131,6 +1229,14 @@ export function useChatPage() {
   const handleSummarizeFile = async (file: IngestedFile) => {
     const sessionId = file.session_id?.trim() || activeSessionId;
     if (!sessionId) return;
+    if (activeChat?.offline) {
+      toast({
+        title: "Cannot summarize",
+        description: "Summaries need AI and are unavailable in Without AI sessions.",
+        variant: "destructive",
+      });
+      return;
+    }
     const docId = file.doc_id?.trim();
     if (!docId) {
       toast({
@@ -1199,7 +1305,11 @@ export function useChatPage() {
 
   const loadConversationMessages = useCallback(async (chatId: string, sessionId: string) => {
     try {
-      const { messages: loadedMessages, title: apiTitle } = await fetchConversation(sessionId);
+      const {
+        messages: loadedMessages,
+        title: apiTitle,
+        offline: sessionOffline,
+      } = await fetchConversation(sessionId);
 
       setChats((prev) =>
         prev.map((c) => {
@@ -1210,6 +1320,7 @@ export function useChatPage() {
           return {
             ...c,
             messages: updatedMessages,
+            offline: sessionOffline,
             ...(apiTitle ? { title: apiTitle } : {}),
           };
         }),
@@ -1339,6 +1450,10 @@ export function useChatPage() {
     setShowRightPanel,
     openRightPanel,
     selectSourceForPreview,
+    offlineMode,
+    offlineQueryTurns,
+    selectedOfflineQueryIndex,
+    selectOfflineQuery,
     showPDF,
     setShowPDF,
     usePreciseSourceHighlight,
@@ -1388,6 +1503,11 @@ export function useChatPage() {
     chatInputRef,
     menuRef,
     createNewChat,
+    openNewChatDialog,
+    modeDialogOpen,
+    setModeDialogOpen,
+    creatingChat,
+    openaiConfigured,
     deleteChat,
     deletingChatId,
     switchChat,
