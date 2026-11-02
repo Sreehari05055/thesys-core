@@ -20,35 +20,36 @@ class CitationsExecutionService:
         self.http_client = http_client or httpx.AsyncClient(timeout=config.HTTP_TIMEOUT)
         self.api_base_url = "https://api.citeas.org/product"
 
+    def _extract_identifier_from_pdf_sync(self, filename: str) -> Optional[str]:
+        with fitz.open(filename) as doc:
+            meta = doc.metadata or {}
+            subject = meta.get("subject", "") or ""
+
+            doi_match = re.search(r'10\.\d{4,9}/[^\s"\'<>]+', subject)
+            if doi_match:
+                return doi_match.group(0).rstrip(".")
+
+            first_pages_text = ""
+            for page in doc[:2]:
+                first_pages_text += page.get_text()
+
+            arxiv_match = re.search(r'arXiv[:\s]*([\d]{4}\.[\d]{4,5})', first_pages_text, re.IGNORECASE)
+            if arxiv_match:
+                return f"https://arxiv.org/abs/{arxiv_match.group(1)}"
+
+            doi_match = re.search(r'10\.\d{4,9}/[^\s"\'<>\]]+', first_pages_text)
+            if doi_match:
+                return doi_match.group(0).rstrip(".")
+
+            title = meta.get("title", "").strip()
+            if title:
+                return title
+        return None
+
     async def _extract_identifier_from_pdf(self, filename: str) -> Optional[str]:
         """Extract a DOI, arXiv ID, or title from a local PDF file."""
         try:
-            with fitz.open(filename) as doc:
-
-                meta = doc.metadata or {}
-                subject = meta.get("subject", "") or ""
-                
-                doi_match = re.search(r'10\.\d{4,9}/[^\s"\'<>]+', subject)
-                if doi_match:
-                    return doi_match.group(0).rstrip(".")
-
-                first_pages_text = ""
-                for page in doc[:2]:
-                    first_pages_text += page.get_text()
-
-                arxiv_match = re.search(r'arXiv[:\s]*([\d]{4}\.[\d]{4,5})', first_pages_text, re.IGNORECASE)
-                if arxiv_match:
-                    return f"https://arxiv.org/abs/{arxiv_match.group(1)}"
-
-                doi_match = re.search(r'10\.\d{4,9}/[^\s"\'<>\]]+', first_pages_text)
-                if doi_match:
-                    return doi_match.group(0).rstrip(".")
-
-                title = meta.get("title", "").strip()
-                if title:
-                    return title
-            return None
-
+            return await asyncio.to_thread(self._extract_identifier_from_pdf_sync, filename)
         except FileNotFoundError:
             logger.error(f"PDF file not found: {filename}", exc_info=True)
             return None
