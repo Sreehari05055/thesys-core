@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from app.services.chatbot_service import ChatbotService
 from app.services.summarizer_service.summarizer_execution import SummaryPersistError
 from app.routes.session_guard import owned_session_dep, SESSION_HEADER
+from app.core.config import config
 from app.utils.pdf_url_verifier import download_pdf_from_url
 
 chatbot_bp = APIRouter()
@@ -31,6 +32,10 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
         summarizer_service=summarizer_service,
         scholar_service=scholar_service,
     )
+    @chatbot_bp.get("/api/status")
+    async def api_status():
+        return JSONResponse(content={"openai_configured": bool(config.OPENAI_API_KEY)})
+
     @chatbot_bp.post('/api/chat', response_class=StreamingResponse)
     async def get_bot_response(
         request: Request,
@@ -106,9 +111,11 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
         try:
             messages = await history_store.get_messages(session_id)
             title = await history_store.get_session_title(session_id)
+            settings = await history_store.get_settings(session_id)
             return JSONResponse(content={
                 "session_id": session_id,
                 "title": title,
+                "offline": bool(settings.get("offline")),
                 "messages": messages,
             })
         except HTTPException:
@@ -139,12 +146,22 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
                 status_code=500
             )
     @chatbot_bp.post('/api/conversations/new')
-    async def new_conversation():
-        """Create a new conversation session"""
-        session_id = await history_store.create_session()
+    async def new_conversation(request: Request):
+        """Create a session. Body may include ``offline``. No API key forces offline."""
+        offline = False
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                offline = bool(body.get("offline"))
+        except Exception:
+            pass
+        if not config.OPENAI_API_KEY:
+            offline = True
+        session_id = await history_store.create_session(offline=offline)
         return JSONResponse(content={
             "session_id": session_id,
-            "message": "New conversation created"
+            "offline": offline,
+            "message": "New conversation created",
         })
     @chatbot_bp.post("/api/settings")
     async def save_settings(session_id: OwnedSession, settings_request: SettingsRequest):

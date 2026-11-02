@@ -93,6 +93,8 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
         try:
             ctype = (request.headers.get("content-type") or "").split(";", 1)[0].lower()
             prepared = []
+            session_settings = await history_store.get_settings(session_id)
+            offline = bool(session_settings.get("offline"))
 
             if ctype == "application/json":
                 sources = [
@@ -185,7 +187,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
                     )
 
             saved_paths = list(dict.fromkeys(saved_paths))
-            await rag_service.add_to_index(session_id, saved_paths)
+            await rag_service.add_to_index(session_id, saved_paths, offline=offline)
 
             names = sorted({os.path.basename(p) for p in saved_paths})
             await history_store.add_message(session_id, {
