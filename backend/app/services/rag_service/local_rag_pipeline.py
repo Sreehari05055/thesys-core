@@ -55,7 +55,7 @@ def _pdf_docs_to_nodes(pdf_docs, session_id: str) -> list:
             doc_id=doc_id,
             doc_title=doc["title"],
         )
-        for idx, chunk in enumerate(chunks):
+        for chunk in chunks:
             chunk_metadata = _chroma_safe({
                 **doc["metadata"],
                 **chunk["metadata"],
@@ -65,7 +65,7 @@ def _pdf_docs_to_nodes(pdf_docs, session_id: str) -> list:
             nodes.append(
                 TextNode(
                     text=chunk["content"],
-                    id_=f"{doc_id}_c{idx}",
+                    id_=chunk["id"],
                     metadata=chunk_metadata,
                     relationships={
                         NodeRelationship.SOURCE: RelatedNodeInfo(node_id=doc_id),
@@ -205,17 +205,30 @@ class LocalRAGPipeline(BaseRAGPipeline):
         except Exception:
             pass
 
+    def _fill_parent_text(self, session_id: str, rows: list) -> list:
+        if not rows:
+            return rows
+        data = self._collection(session_id).get(
+            ids=[r["parent_id"] for r in rows],
+            include=["documents"],
+        )
+        text_by_id = dict(zip(data["ids"], data["documents"]))
+        for r in rows:
+            r["content"] = text_by_id[r["parent_id"]]
+        return rows
+
     def _chunks_by_ids(self, session_id: str, chunk_ids: list) -> list:
         data = self._collection(session_id).get(
             ids=list(chunk_ids),
             include=["documents", "metadatas"],
         )
-        return [
-            self.chunk_dict_from_row(nid, text or "", meta or {})
+        rows = [
+            self.chunk_dict_from_row(nid, text, meta)
             for nid, text, meta in zip(
                 data["ids"], data["documents"], data["metadatas"]
             )
         ]
+        return self._fill_parent_text(session_id, rows)
 
     async def _get_corpus_data(
         self, questions: List[str], user_query: str, session_id: str, search_params=None
@@ -225,9 +238,10 @@ class LocalRAGPipeline(BaseRAGPipeline):
         if source_ids:
             return self._chunks_by_ids(session_id, source_ids)
         await self._load_index(session_id)
-        return await self._retrieve_from_session_index(
+        rows = await self._retrieve_from_session_index(
             questions, user_query, session_id, search_params
         )
+        return self._fill_parent_text(session_id, rows)
 
     async def fetch_texts_for_summarizer(
         self, session_id: str, filenames: list | None = None
