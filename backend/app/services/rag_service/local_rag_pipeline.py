@@ -121,7 +121,11 @@ class LocalRAGPipeline(BaseRAGPipeline):
             query_instruction="Represent this sentence for searching relevant passages: ",
         )
         self.query_embed_model = self.doc_embed_model
-        self.reranker = self.create_reranker()
+        self.reranker = FlagEmbeddingReranker(
+            model=_RERANK_MODEL,
+            top_n=self.config.TOP_N,
+            use_fp16=config.USE_GPU_ACCELERATION,
+        )
 
     def get_doc_embed_model(self):
         return self.doc_embed_model
@@ -133,12 +137,8 @@ class LocalRAGPipeline(BaseRAGPipeline):
         return self.reranker
 
     def create_reranker(self, top_n: int | None = None):
-        n = top_n or self.config.TOP_N
-        reranker = getattr(self, "reranker", None)
-        if reranker is None:
-            return FlagEmbeddingReranker(model=_RERANK_MODEL, top_n=n)
-        reranker.top_n = n
-        return reranker
+        self.reranker.top_n = top_n or self.config.TOP_N
+        return self.reranker
 
     def _files_dir(self, session_id: str) -> str:
         return os.path.join(os.path.dirname(DEFAULT_DB_PATH), "sessions", session_id, "source_files")
