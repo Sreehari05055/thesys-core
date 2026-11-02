@@ -172,20 +172,27 @@ export function normalizeLoadedMessages(raw: unknown): ChatMessage[] {
         text = record.text;
       }
 
-      if (text) {
-        if (sender === "user") {
-          normalized.push({ sender, text });
-        } else {
-          const botFields = botMessageFields(record, pendingExternalPapers);
-          pendingExternalPapers = [];
-          normalized.push({
-            sender,
-            text,
-            raw: text,
-            ...botFields,
-          });
-        }
+      if (sender === "user") {
+        if (!text) continue;
+        normalized.push({ sender, text });
+        continue;
       }
+
+      // Offline turns store an empty assistant reply with sources attached.
+      const botFields = botMessageFields(record, pendingExternalPapers);
+      const hasPayload =
+        Boolean(text) ||
+        (botFields.sources?.length ?? 0) > 0 ||
+        (botFields.compareRelations?.length ?? 0) > 0 ||
+        (botFields.externalPapers?.length ?? 0) > 0;
+      if (!hasPayload) continue;
+      pendingExternalPapers = [];
+      normalized.push({
+        sender,
+        text: text || "",
+        raw: text || "",
+        ...botFields,
+      });
       continue;
     }
 
@@ -472,7 +479,31 @@ export function buildSourceIndex(sources: Source[]) {
   return { knownSourceIds, allSourcesById, globalSourceNumberById };
 }
 
-/** Cited sources across a conversation, in order of first LLM citation. */
+/** One offline search: user query + sources on the following bot message. */
+export type OfflineQueryTurn = {
+  index: number;
+  query: string;
+  sources: Source[];
+};
+
+export function collectOfflineQueryTurns(messages: ChatMessage[]): OfflineQueryTurn[] {
+  const turns: OfflineQueryTurn[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg?.sender !== "user") continue;
+    const query = (msg.text || "").trim();
+    if (!query) continue;
+    const next = messages[i + 1];
+    const sources =
+      next?.sender === "bot"
+        ? [...(next.sources ?? []), ...flattenRelationChunks(next.compareRelations ?? [])]
+        : [];
+    turns.push({ index: turns.length, query, sources });
+  }
+  return turns;
+}
+
+/** Sources for the panel: LLM citations, or all attached sources when the bot reply is empty (offline). */
 export function collectCitedConversationSources(messages: ChatMessage[]): Source[] {
   const allSources = messages.flatMap((m) => [
     ...(m.sources ?? []),
@@ -483,10 +514,22 @@ export function collectCitedConversationSources(messages: ChatMessage[]): Source
   const result: Source[] = [];
   const seen = new Set<string>();
 
+  const push = (src: Source | undefined) => {
+    if (!src || seen.has(src.id)) return;
+    seen.add(src.id);
+    result.push(src);
+  };
+
   for (const msg of messages) {
     if (msg.sender !== "bot") continue;
     const text = (msg.raw ?? msg.text)?.trim();
-    if (!text) continue;
+
+    // Offline turns have no reply text; show every retrieved source on the message.
+    if (!text) {
+      for (const src of msg.sources ?? []) push(src);
+      for (const src of flattenRelationChunks(msg.compareRelations ?? [])) push(src);
+      continue;
+    }
 
     const ctx = buildCitationTokenContext(msg.sources, {
       knownSourceIds: fullIndex.knownSourceIds,
@@ -495,12 +538,7 @@ export function collectCitedConversationSources(messages: ChatMessage[]): Source
     });
 
     for (const id of extractCitedSourceIds(text, ctx)) {
-      if (seen.has(id)) continue;
-      const src = fullIndex.allSourcesById.get(id);
-      if (src) {
-        seen.add(id);
-        result.push(src);
-      }
+      push(fullIndex.allSourcesById.get(id));
     }
   }
 
