@@ -7,6 +7,7 @@ import { SITE_NAME } from "@/lib/siteMeta";
 import { researchScopePlaceholder } from "@/lib/researchScope";
 import { ChatComposer } from "./ChatComposer";
 import { ChatMessageList } from "./ChatMessageList";
+import { OfflineQueryHistory } from "./OfflineQueryHistory";
 import { PendingSourceChips } from "./PendingSourceChips";
 import { ChatRightPanel } from "./ChatRightPanel";
 import { ResearchScopePicker } from "./ResearchScopePicker";
@@ -21,6 +22,7 @@ const PANEL_SPLIT = {
   closed: { chat: 100, intel: 0 },
   list: { chat: 62, intel: 38 },
   preview: { chat: 42, intel: 58 },
+  offlinePreview: { chat: 34, intel: 66 },
 } as const;
 
 export function ChatMainPanel({ model }: ChatMainPanelProps) {
@@ -42,7 +44,7 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
     documentSummary,
     summaryLoading,
     chatWindowRef,
-    createNewChat,
+    openNewChatDialog,
     messages,
     allSourcesById,
     globalSourceNumberById,
@@ -78,12 +80,16 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
     canCompare,
     compareMode,
     setCompareMode,
+    offlineMode,
+    offlineQueryTurns,
+    selectedOfflineQueryIndex,
+    selectOfflineQuery,
     sidebarView,
   } = model;
 
   const libraryView = sidebarView === "library";
 
-  const discoverMode = researchScope === "discover";
+  const discoverMode = !offlineMode && researchScope === "discover";
 
   useEffect(() => {
     const chatPanel = chatPanelRef.current;
@@ -93,12 +99,14 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
     const target = !showRightPanel
       ? PANEL_SPLIT.closed
       : showPDF
-        ? PANEL_SPLIT.preview
+        ? offlineMode
+          ? PANEL_SPLIT.offlinePreview
+          : PANEL_SPLIT.preview
         : PANEL_SPLIT.list;
 
     chatPanel.resize(target.chat);
     intelPanel.resize(target.intel);
-  }, [showRightPanel, showPDF, activeChatId]);
+  }, [showRightPanel, showPDF, activeChatId, offlineMode]);
 
   return (
     <main className="flex-1 h-full overflow-hidden bg-background" aria-label="Research workspace">
@@ -205,13 +213,20 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
                           </div>
                           <button
                             type="button"
-                            onClick={createNewChat}
+                            onClick={openNewChatDialog}
                             className="mt-5 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-[13px] font-semibold hover:brightness-95 transition-all"
                           >
                             New session
                           </button>
                         </div>
                       </div>
+                    ) : offlineMode ? (
+                      <OfflineQueryHistory
+                        turns={offlineQueryTurns}
+                        selectedIndex={selectedOfflineQueryIndex}
+                        loading={loading}
+                        onSelect={selectOfflineQuery}
+                      />
                     ) : messages.length === 0 ? (
                       <div className="flex h-full min-h-[60vh] items-center justify-center" data-testid="state-chat-empty">
                         <div className="max-w-sm text-center">
@@ -272,6 +287,7 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
                         selectedDocCount: selectedChatDocs.length,
                         singleDocName: selectedChatDocs[0]?.filename,
                         compareMode,
+                        offline: offlineMode,
                       })}
                       lead={
                         !discoverMode ? (
@@ -290,25 +306,32 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
                             onCite={handleCite}
                             onDelete={handleDeleteIngestedFile}
                             deletingFilename={deletingFile}
+                            summarizeDisabled={offlineMode}
                             triggerClassName="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
                           />
                         ) : undefined
                       }
                       insetFooter={
-                        <>
-                          <ResearchScopePicker
-                            scope={researchScope}
-                            onScopeChange={setResearchScope}
-                            disabled={loading}
-                          />
-                          {canCompare ? (
-                            <CompareModeToggle
-                              on={compareMode}
-                              onToggle={setCompareMode}
+                        offlineMode ? (
+                          <span className="text-[11px] font-medium text-muted-foreground">
+                            Without AI · highlights only
+                          </span>
+                        ) : (
+                          <>
+                            <ResearchScopePicker
+                              scope={researchScope}
+                              onScopeChange={setResearchScope}
                               disabled={loading}
                             />
-                          ) : null}
-                        </>
+                            {canCompare ? (
+                              <CompareModeToggle
+                                on={compareMode}
+                                onToggle={setCompareMode}
+                                disabled={loading}
+                              />
+                            ) : null}
+                          </>
+                        )
                       }
                     />
                   </div>
