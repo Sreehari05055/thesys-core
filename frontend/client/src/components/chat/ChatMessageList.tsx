@@ -53,7 +53,7 @@ export function ChatMessageList({
           >
             {isUser ? (
               (() => {
-                const parsed = isReader ? parseReaderUserMessage(msg.text) : null;
+                const parsed = parseReaderUserMessage(msg.text);
                 const question = parsed?.question ?? msg.text;
                 const showChips = (parsed?.passages.length ?? 0) > 0;
                 return (
