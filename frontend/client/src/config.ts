@@ -25,16 +25,15 @@ export const API_URLS = {
   /** DELETE — requires `X-Session-ID`. */
   deleteConversation: `${config.apiBaseUrl}/api/conversations`,
 
-  /** GET — ingested file by md5 `doc_id`, or verified external PDF when `url` is set (path id = paper id). Requires `X-Session-ID`. */
+  /** GET — ingested file by md5 `doc_id`. Requires `X-Session-ID`. */
   sessionFile: (
     docId: string,
-    query?: { pageNumber?: string | number; url?: string; download?: boolean },
+    query?: { pageNumber?: string | number; download?: boolean },
   ) => {
     const base = `${config.apiBaseUrl}/api/files/${encodeURIComponent(docId)}`;
     if (!query) return base;
 
     const search = new URLSearchParams();
-    if (query.url?.trim()) search.set("url", query.url.trim());
     if (query.download) search.set("download", "true");
     const page = query.pageNumber;
     if (page !== undefined && page !== null && page !== "") {
@@ -42,6 +41,20 @@ export const API_URLS = {
     }
     const qs = search.toString();
     return qs ? `${base}?${qs}` : base;
+  },
+
+  /** GET — verified external PDF. Path id is the paper id. Requires `X-Session-ID`. */
+  externalPaperFile: (
+    paperId: string,
+    query: { url: string; pageNumber?: string | number },
+  ) => {
+    const search = new URLSearchParams();
+    search.set("url", query.url.trim());
+    const page = query.pageNumber;
+    if (page !== undefined && page !== null && page !== "") {
+      search.set("page_number", String(page));
+    }
+    return `${config.apiBaseUrl}/api/papers/${encodeURIComponent(paperId)}?${search}`;
   },
 
   /** GET — table/formula overlay regions for reader mode. Requires `X-Session-ID`. */

@@ -43,7 +43,7 @@ export function ExternalPdfPreview({
           throw new Error("No verified PDF URL for this paper.");
         }
 
-        const fileUrl = API_URLS.sessionFile(paper.id, {
+        const fileUrl = API_URLS.externalPaperFile(paper.id, {
           url: paper.pdf_url,
           pageNumber,
         });
