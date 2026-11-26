@@ -20,11 +20,6 @@ class BaseResearchService:
         match = re.search(r"(\d{4}\.\d{4,5})", base)
         return match.group(1) if match else None
 
-    async def semantic_scholar_search(
-        self, query, count=25, publication_year=None, is_open_access=None, has_pdf=None
-    ) -> str:
-        return "Semantic Scholar search functionality is not available. Please check your configuration."
-
     @staticmethod
     def reconstruct_openalex_abstract(inverted_index: dict | None) -> str | None:
         """Rebuild plaintext from OpenAlex ``abstract_inverted_index``."""
