@@ -31,7 +31,6 @@ class ToolExecutor:
     async def _execute_search_research(self, args, ctx):
         session_id = ctx.get("session_id")
         search_params = dict(ctx.get("search_params") or {})
-        args.get("top_n") is not None and search_params.update(top_n=args["top_n"])
         return await self.rag_service.search_corpus(
             queries=args.get("topic"),
             user_query=args.get("question"),
