@@ -1,28 +1,29 @@
 import json
 from app import logger
 
+_TOOLS = {
+    "SearchResearch": "_execute_search_research",
+    "FetchResearch": "_execute_fetch_research",
+    "CompareResearch": "_execute_compare_research",
+}
+
+
 class ToolExecutor:
     def __init__(self, rag_service=None, scholar_service=None):
         self.rag_service = rag_service
         self.scholar_service = scholar_service
 
     async def execute(self, function_name, args_str, session_id=None, store=None, search_params=None):
-        """Dynamic tool dispatcher."""
+        """Run one of the fixed tools."""
         try:
-            dispatch_map = {
-                "SearchResearch": self._execute_search_research,
-                "FetchResearch": self._execute_fetch_research,
-                "CompareResearch": self._execute_compare_research,
-            }
             args = json.loads(args_str) if args_str.strip() else {}
             ctx = {
                 "session_id": session_id,
                 "store": store,
                 "search_params": search_params
             }
-            
             logger.info("Executing tool: %s", function_name)
-            return await dispatch_map[function_name](args, ctx)
+            return await getattr(self, _TOOLS[function_name])(args, ctx)
         except Exception:
             logger.error("Tool failure [%s]", function_name, exc_info=True)
             raise
@@ -31,7 +32,7 @@ class ToolExecutor:
         session_id = ctx.get("session_id")
         search_params = dict(ctx.get("search_params") or {})
         args.get("top_n") is not None and search_params.update(top_n=args["top_n"])
-        return await self.rag_service.get_info(
+        return await self.rag_service.search_corpus(
             queries=args.get("topic"),
             user_query=args.get("question"),
             session_id=session_id,
@@ -39,7 +40,7 @@ class ToolExecutor:
         )
 
     async def _execute_fetch_research(self, args, ctx):
-        """Fetch academic papers via ScholarExecutionService; returns papers + context_text dict."""
+        """Fetch papers from OpenAlex and arXiv; returns papers + context_text dict."""
         payload = await self.scholar_service.fetch_research(
             query=args.get("query") or "",
             doi=args.get("doi"),

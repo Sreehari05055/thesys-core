@@ -203,7 +203,7 @@ class ChatbotService:
                 if active_documents:
                     user_msg["active_documents"] = active_documents
                 await self.store.add_message(session_id, user_msg)
-                result = await self.rag_service.get_info(
+                result = await self.rag_service.search_corpus(
                     queries=[query],
                     user_query=query,
                     session_id=session_id,
@@ -300,7 +300,7 @@ class ChatbotService:
             if source_ids and not compare_mode:
                 allowed_source_ids |= {str(s).lower() for s in source_ids if s}
                 try:
-                    prefetch_result = await self.rag_service.get_info(
+                    prefetch_result = await self.rag_service.search_corpus(
                         queries=[query],
                         user_query=query,
                         session_id=session_id,

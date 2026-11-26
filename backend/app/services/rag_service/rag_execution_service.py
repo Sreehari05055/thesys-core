@@ -32,8 +32,8 @@ class RAGExecutionService:
             queries, user_query, session_id, search_params=params
         )
 
-    async def get_info(self, queries: list[str], user_query: str, session_id: str, search_params=None):
-        logger.info(f"Fetching quick knowledge for session {session_id} using keywords: {queries}")
+    async def search_corpus(self, queries: list[str], user_query: str, session_id: str, search_params=None):
+        logger.info(f"Corpus search for session {session_id} using keywords: {queries}")
         context_list = await self.rag_pipeline._get_corpus_data(queries, user_query, session_id, search_params=search_params)
         sources = [_public_chunk(c) for c in context_list]
         return {
