@@ -13,7 +13,7 @@ def _citeas_product_url(base: str, resource: str) -> str:
     return f"{base}/{quote(resource, safe='')}"
 
 
-class CitationsExecutionService:
+class CitationsService:
     def __init__(self, http_client=None):
         self.email = config.EMAIL
         self._owns_client = http_client is None
