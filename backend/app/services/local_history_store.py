@@ -20,8 +20,9 @@ def _now() -> str:
 def _clean_title(title: str) -> str:
     return re.sub(r"\s+", " ", title).strip().strip("\"'")
 
-def _doc_id(filename: str) -> str:
-    return hashlib.md5(os.path.basename(filename).encode()).hexdigest()
+def doc_id_for_filename(filename: str) -> str:
+    name = os.path.basename((filename or "").strip())
+    return hashlib.md5(name.encode()).hexdigest() if name else ""
 
 def _pack_content(message: dict) -> str:
     packed = {"text": message["content"]}
@@ -495,7 +496,7 @@ class LocalHistoryStore():
             "SELECT file_name, file_path FROM ingestion_files WHERE chat_id = ?",
             (session_id,),
         ).fetchall()
-        by_id = {_doc_id(r["file_name"]): r for r in rows}
+        by_id = {doc_id_for_filename(r["file_name"]): r for r in rows}
         missing = [d for d in wanted if d not in by_id]
         if missing:
             raise DocIdNotFoundError(missing)
