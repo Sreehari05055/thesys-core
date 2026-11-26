@@ -15,7 +15,6 @@ from app.schemas.schemas import ChatRequest, SettingsRequest, CiteRequest, CiteE
 import asyncio
 from fastapi.responses import FileResponse
 from app.services.chatbot_service import ChatbotService
-from app.services.summarizer_service.summarizer_execution import SummaryPersistError
 from app.routes.session_guard import owned_session_dep, SESSION_HEADER
 from app.core.config import config
 from app.utils.pdf_url_verifier import download_pdf_from_url
@@ -25,11 +24,9 @@ chatbot_bp = APIRouter()
 def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_service, summarizer_service, scholar_service, citations_service):
     OwnedSession = Annotated[str, Depends(owned_session_dep(history_store))]
     chatbot_service = ChatbotService(
-        system_prompt=system_prompt, 
-        store=history_store,   
-        http_client=http_client,
+        system_prompt=system_prompt,
+        store=history_store,
         rag_service=rag_service,
-        summarizer_service=summarizer_service,
         scholar_service=scholar_service,
     )
     @chatbot_bp.get("/api/status")
@@ -454,7 +451,6 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
                 [filename],
                 provider=session_settings.get("provider"),
                 model_name=session_settings.get("model"),
-                doc_id=resolved_doc_id,
             )
 
             if isinstance(result, str):
@@ -466,21 +462,36 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
                 logger.error("summarize_session_file: %s", result)
                 return JSONResponse(content={"error": result}, status_code=500)
 
+            try:
+                saved = await history_store.insert_document_summary(
+                    chat_id=session_id,
+                    doc_id=resolved_doc_id,
+                    filename=filename,
+                    chunks=[{"summary": result["summary"], "sources": result.get("sources", [])}],
+                )
+            except Exception as e:
+                logger.error(
+                    "document_summaries insert failed chat_id=%s doc_id=%s: %s",
+                    session_id,
+                    resolved_doc_id,
+                    e,
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail={"error": "summary_save_failed", "message": "Summary generated but could not be saved."},
+                ) from e
+
             return JSONResponse(
                 content={
                     "doc_id": resolved_doc_id,
                     "filename": filename,
                     "summary": result["summary"],
                     "sources": result.get("sources", []),
-                    "summary_id": result["summary_id"],
-                    "created_at": result["created_at"],
+                    "summary_id": saved["id"],
+                    "created_at": saved["created_at"],
                 }
             )
-        except SummaryPersistError as e:
-            raise HTTPException(
-                status_code=500,
-                detail={"error": "summary_save_failed", "message": str(e)},
-            ) from e
         except HTTPException:
             raise
         except Exception as e:
