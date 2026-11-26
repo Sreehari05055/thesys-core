@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 import asyncio
 import hashlib
@@ -10,57 +9,12 @@ from llama_index.core.vector_stores.types import MetadataFilters, MetadataFilter
 from app.utils.bbox_utils import as_list, filter_highlight_bboxes
 
 
-class BaseRAGPipeline(ABC):
-    """
-    Shared RAG orchestration: embed/rerank hooks (abstract) + dedupe/rerank + vector retrieval
-    when a LlamaIndex index is already in ``session_indices``.
-    """
+class BaseRAGPipeline:
+    """Dedupe, rerank, and retrieve from a LlamaIndex index already in ``session_indices``."""
     session_indices = {}
 
     def __init__(self):
         self.config = config
-
-    @abstractmethod
-    def get_doc_embed_model(self):
-        """Return the embedding model for document indexing."""
-        ...
-
-    @abstractmethod
-    def get_query_embed_model(self):
-        """Return the embedding model for query retrieval."""
-        ...
-
-    @abstractmethod
-    def get_reranker(self):
-        """Return the reranker model."""
-        ...
-
-    @abstractmethod
-    def create_reranker(self, top_n: int | None = None):
-        """Return a fresh per-request reranker (must not mutate the shared singleton)."""
-        ...
-
-    @abstractmethod
-    async def _load_index(self, session_id: str):
-        """Load or establish an in-memory index handle for the session."""
-        ...
-
-    @abstractmethod
-    async def _add_to_index(self, session_id: str, file_paths: List[str]):
-        """Incrementally index new files."""
-        ...
-
-    @abstractmethod
-    async def _build_index(self, session_id: str):
-        """Full rebuild of the session index."""
-        ...
-
-    @abstractmethod
-    async def _get_corpus_data(
-        self, questions: List[str], user_query: str, session_id: str, search_params=None
-    ) -> list:
-        """Retrieve ranked context chunks for retrieval/RAG."""
-        ...
 
     @staticmethod
     def _node_is_reference_section(node) -> bool:
