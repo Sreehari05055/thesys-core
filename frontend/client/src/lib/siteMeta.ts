@@ -17,8 +17,6 @@ export const CONTACT_EMAIL = "researchbetainfo@gmail.com";
 /** Shown on Terms of Service and Privacy Policy. */
 export const LEGAL_LAST_UPDATED = "25 May 2026";
 
-export const SITE_TAGLINE = "Research workspace for document-grounded analysis";
-
 export const SITE_DESCRIPTION =
   "Upload papers, query your library with cited answers, preview source passages, and export bibliographies — built for serious research.";
 
