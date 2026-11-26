@@ -184,19 +184,6 @@ class LocalRAGPipeline(BaseRAGPipeline):
 
         BaseRAGPipeline.session_indices[session_id] = await asyncio.to_thread(_work)
 
-    async def build_index(self, session_id: str):
-        await self.delete_session_vectors(session_id)
-        data_dir = self._files_dir(session_id)
-        os.makedirs(data_dir, exist_ok=True)
-
-        def _work():
-            nodes = _pdf_docs_to_nodes(list(iter_documents(data_dir)), session_id)
-            index = self._fresh_index(session_id)
-            index.insert_nodes(nodes)
-            return index
-
-        BaseRAGPipeline.session_indices[session_id] = await asyncio.to_thread(_work)
-
     async def delete_doc_vectors(self, session_id: str, doc_ids: list[str]) -> None:
         ids = list(dict.fromkeys(
             unquote(d or "").strip().lower() for d in doc_ids if (d or "").strip()
