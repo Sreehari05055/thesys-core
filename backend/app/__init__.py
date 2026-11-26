@@ -75,10 +75,33 @@ def create_app() -> FastAPI:
             SessionMiddleware, 
             secret_key=os.getenv("SESSION_SECRET_KEY", "change-me-in-production")
         )
-    from app.routes.chatbot_routes import init_chatbot_routes
-    from app.routes.ingest_routes import init_ingest_routes
-    init_ingest_routes(app, history_store, citations_service, rag_service, http_client)
-    init_chatbot_routes(app, config.system_prompt, history_store, http_client, rag_service, summarizer_service, scholar_service, citations_service)
+    from app.services.chatbot_service import ChatbotService
+    from app.routes.errors import add_exception_handlers
+    from app.routes.chat_routes import router as chat_router
+    from app.routes.conversation_routes import router as conversation_router
+    from app.routes.citation_routes import router as citation_router
+    from app.routes.file_routes import router as file_router
+    from app.routes.summary_routes import router as summary_router
+    from app.routes.ingest_routes import router as ingest_router
+
+    app.state.history_store = history_store
+    app.state.http_client = http_client
+    app.state.rag_service = rag_service
+    app.state.summarizer_service = summarizer_service
+    app.state.citations_service = citations_service
+    app.state.chatbot_service = ChatbotService(
+        system_prompt=config.system_prompt,
+        store=history_store,
+        rag_service=rag_service,
+        scholar_service=scholar_service,
+    )
+    add_exception_handlers(app)
+    app.include_router(chat_router)
+    app.include_router(conversation_router)
+    app.include_router(citation_router)
+    app.include_router(file_router)
+    app.include_router(summary_router)
+    app.include_router(ingest_router)
     return app
 
 __all__ = ["create_app", "logger"]
