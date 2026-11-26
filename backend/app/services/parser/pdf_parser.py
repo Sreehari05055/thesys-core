@@ -12,7 +12,7 @@ from docling_core.types.doc import CodeItem, DocItemLabel, PictureItem, SectionH
 from docling_core.types.doc.document import CodeItem
 from app import logger
 from pydantic import AnyUrl
-from app.core.config import admin, config
+from app.core.config import config
 from docling_core.types.doc.base import BoundingBox, CoordOrigin
 from docling_core.types.doc.page import TextCellUnit
 
@@ -234,7 +234,7 @@ class PDFExtractor:
         try:
             logger.info("Extracting PDF with Docling: %s", filepath)
             doc_title = os.path.basename(filepath)
-            max_pages = admin.rag.max_pdf_pages
+            max_pages = config.MAX_PDF_PAGES
 
             kwargs = {}
             if max_pages > 0:
