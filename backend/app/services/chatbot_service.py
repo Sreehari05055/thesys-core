@@ -3,10 +3,10 @@ import re
 from typing import AsyncGenerator, List, Dict, Any
 from app import logger
 from app.core.config import config
-from app.services.langchain_handler.langchain_service import LangChainService
+from app.services.langchain_handler.langchain_service import get_llm
 from app.services.langchain_handler.tool_definitions import CompareResearch, FetchResearch, get_tool_schemas
 from app.services.session_title_service import SessionTitleService
-from app.prompts.prompts import (
+from app.prompts import (
     format_active_documents_scope,
     get_fetch_research_system_prompt,
 )
@@ -235,7 +235,7 @@ class ChatbotService:
                     model_name=search_params.get("model"),
                 )
 
-            llm = LangChainService.get_llm(
+            llm = get_llm(
                 provider=search_params.get("provider"),
                 model_name=search_params.get("model"),
             )

@@ -4,8 +4,8 @@ from typing import Optional
 from langchain_core.messages import HumanMessage, SystemMessage
 from app import logger
 from app.core.config import config
-from app.prompts.prompts import get_session_title_prompt
-from app.services.langchain_handler.langchain_service import LangChainService
+from app.prompts import get_session_title_prompt
+from app.services.langchain_handler.langchain_service import get_llm
 
 
 class SessionTitleService:
@@ -35,7 +35,7 @@ class SessionTitleService:
             return None
 
         try:
-            llm = LangChainService.get_llm(provider=provider, model_name=model_name)
+            llm = get_llm(provider=provider, model_name=model_name)
             try:
                 llm = llm.bind(max_tokens=32, reasoning_effort="none")
             except Exception:

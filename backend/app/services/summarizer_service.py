@@ -3,8 +3,8 @@ from typing import Any, Dict, List, Optional, Union
 from langchain_core.messages import HumanMessage, SystemMessage
 from app import logger
 from app.core.config import config
-from app.prompts.prompts import get_summarizer_chunk_extract_prompt, get_summarizer_reduce_prompt
-from app.services.langchain_handler.langchain_service import LangChainService
+from app.prompts import get_summarizer_chunk_extract_prompt, get_summarizer_reduce_prompt
+from app.services.langchain_handler.langchain_service import get_llm
 
 class SummarizerService:
     def __init__(self, pipeline):
@@ -128,7 +128,7 @@ class SummarizerService:
                 SystemMessage(content=get_summarizer_chunk_extract_prompt()),
                 HumanMessage(content=chunk_text),
             ]
-            llm = LangChainService.get_llm(provider=provider, model_name=model_name)
+            llm = get_llm(provider=provider, model_name=model_name)
             response = await llm.ainvoke(messages)
             return self._response_content_to_str(response.content)
         except Exception as e:
@@ -147,7 +147,7 @@ class SummarizerService:
                 SystemMessage(content=get_summarizer_reduce_prompt()),
                 HumanMessage(content=joined_extractions),
             ]
-            llm = LangChainService.get_llm(provider=provider, model_name=model_name)
+            llm = get_llm(provider=provider, model_name=model_name)
             response = await llm.ainvoke(messages)
             return self._response_content_to_str(response.content)
         except Exception as e:
