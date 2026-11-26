@@ -68,6 +68,7 @@ import {
 export function useChatPage() {
   // ── Multi-chat state ──
   const [chats, setChats] = useState<Chat[]>(() => sortChatsByRecent(loadChats()));
+  const [models, setModels] = useState<string[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(() => {
     const loaded = sortChatsByRecent(loadChats());
     const stored = loadActiveChatId();
@@ -371,6 +372,10 @@ export function useChatPage() {
                 lastAccessAt: apiLastAccess ?? existing?.lastAccessAt,
                 createdAt: apiCreatedAt ?? existing?.createdAt ?? Date.now(),
                 offline: session.offline === true || existing?.offline === true,
+                model:
+                  typeof session.model === "string" && session.model
+                    ? session.model
+                    : existing?.model,
               };
             })
             .filter((chat): chat is Chat => chat !== null);
@@ -398,6 +403,61 @@ export function useChatPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(API_URLS.models);
+        if (!res.ok) return;
+        const data = await res.json();
+        const names = Array.isArray(data?.models)
+          ? data.models
+              .map((row: { model?: string }) => row?.model)
+              .filter((name: unknown): name is string => typeof name === "string" && name.length > 0)
+          : [];
+        if (!cancelled) setModels(names);
+      } catch {
+        // dropdown stays empty until the list route is up
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const modelOptions = useMemo(() => {
+    const names = [...models];
+    if (activeChat?.model && !names.includes(activeChat.model)) names.unshift(activeChat.model);
+    return names;
+  }, [models, activeChat?.model]);
+
+  const selectModel = useCallback(
+    async (model: string) => {
+      if (!activeChat || activeChat.offline || !model || activeChat.model === model) return;
+      if (activeChat.messages.some((m) => m.sender === "user")) return;
+      try {
+        const res = await apiFetch(
+          API_URLS.saveSettings,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model }),
+          },
+          activeChat.sessionId,
+        );
+        if (!res.ok) throw new Error(await getApiErrorMessage(res));
+        setChats((prev) => prev.map((c) => (c.id === activeChat.id ? { ...c, model } : c)));
+      } catch (err) {
+        toast({
+          title: "Could not change model",
+          description: err instanceof Error ? err.message : "Try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    [activeChat, toast],
+  );
 
   // ── Close menu on outside click ──
   useEffect(() => {
@@ -448,6 +508,7 @@ export function useChatPage() {
       const wantOffline = openaiConfigured === false ? true : offline;
       let sessionId: string;
       let sessionOffline = wantOffline;
+      let sessionModel = "";
       try {
         const res = await apiFetch(API_URLS.newConversation, {
           method: "POST",
@@ -460,6 +521,7 @@ export function useChatPage() {
         if (typeof id !== "string" || !id.trim()) throw new Error("Invalid session_id");
         sessionId = id.trim();
         sessionOffline = data.offline === true || wantOffline;
+        sessionModel = typeof data.model === "string" ? data.model : "";
       } catch (err) {
         console.error("[createNewChat] /api/conversations/new failed — falling back to local UUID:", err);
         sessionId = crypto.randomUUID();
@@ -473,6 +535,7 @@ export function useChatPage() {
         lastAccessAt: Date.now(),
         sessionId,
         offline: sessionOffline,
+        model: sessionModel || undefined,
       };
 
       setChats((prev) => sortChatsByRecent([newChat, ...prev]));
@@ -1309,6 +1372,7 @@ export function useChatPage() {
         messages: loadedMessages,
         title: apiTitle,
         offline: sessionOffline,
+        model: sessionModel,
       } = await fetchConversation(sessionId);
 
       setChats((prev) =>
@@ -1321,6 +1385,7 @@ export function useChatPage() {
             ...c,
             messages: updatedMessages,
             offline: sessionOffline,
+            ...(sessionModel ? { model: sessionModel } : {}),
             ...(apiTitle ? { title: apiTitle } : {}),
           };
         }),
@@ -1508,6 +1573,8 @@ export function useChatPage() {
     setModeDialogOpen,
     creatingChat,
     openaiConfigured,
+    modelOptions,
+    selectModel,
     deleteChat,
     deletingChatId,
     switchChat,

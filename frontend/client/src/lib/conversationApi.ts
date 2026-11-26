@@ -130,6 +130,7 @@ export async function fetchConversation(sessionId: string): Promise<{
   messages: ChatMessage[];
   title: string | null;
   offline: boolean;
+  model: string;
 }> {
   const res = await apiFetch(API_URLS.loadConversation, {}, sessionId);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -140,5 +141,6 @@ export async function fetchConversation(sessionId: string): Promise<{
     messages: normalizeLoadedMessages(extractConversationMessages(data)),
     title,
     offline: data.offline === true,
+    model: typeof data.model === "string" ? data.model : "",
   };
 }

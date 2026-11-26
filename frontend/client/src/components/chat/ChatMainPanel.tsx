@@ -10,6 +10,7 @@ import { ChatMessageList } from "./ChatMessageList";
 import { OfflineQueryHistory } from "./OfflineQueryHistory";
 import { PendingSourceChips } from "./PendingSourceChips";
 import { ChatRightPanel } from "./ChatRightPanel";
+import { ModelPicker } from "./ModelPicker";
 import { ResearchScopePicker } from "./ResearchScopePicker";
 import { CompareModeToggle } from "./CompareModeToggle";
 import { MyLibraryPanel } from "./MyLibraryPanel";
@@ -76,6 +77,8 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
     selectedChatDocs,
     canSend,
     researchScope,
+    modelOptions,
+    selectModel,
     setResearchScope,
     canCompare,
     compareMode,
@@ -88,6 +91,7 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
   } = model;
 
   const libraryView = sidebarView === "library";
+  const asked = messages.some((m) => m.sender === "user");
 
   const discoverMode = !offlineMode && researchScope === "discover";
 
@@ -323,6 +327,23 @@ export function ChatMainPanel({ model }: ChatMainPanelProps) {
                               onScopeChange={setResearchScope}
                               disabled={loading}
                             />
+                            {activeChat?.model && modelOptions.length > 0 ? (
+                              !asked ? (
+                                <ModelPicker
+                                  models={modelOptions}
+                                  value={activeChat.model}
+                                  onChange={(name) => void selectModel(name)}
+                                  disabled={loading}
+                                />
+                              ) : (
+                                <span
+                                  className="inline-flex shrink-0 items-center rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground"
+                                  data-testid="text-chat-model"
+                                >
+                                  {activeChat.model}
+                                </span>
+                              )
+                            ) : null}
                             {canCompare ? (
                               <CompareModeToggle
                                 on={compareMode}
