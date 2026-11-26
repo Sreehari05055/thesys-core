@@ -1,60 +1,13 @@
 from dotenv import load_dotenv
 import os
-from dataclasses import dataclass, field
 from app.prompts import get_system_prompt
 from app.core.hardware import should_use_acceleration
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 ENV_PATH = os.path.join(BACKEND_ROOT, ".env")
 
 load_dotenv(dotenv_path=ENV_PATH)
 
-@dataclass
-class ModelConfig:
-    temperature: float = 0.7
-    max_tokens: int = 4096
-    top_p: float = 0.9
-
-
-@dataclass
-class RAGConfig:
-    child_chunk_size: int = 64
-    parent_chunk_size: int = 448
-    top_k: int = 20
-    top_n: int = 8
-    compare_top_n: int = 4
-    compare_min_conf: float = 0.70
-    max_pdf_pages: int = 40
-
-
-@dataclass
-class AdminConfig:
-    """User-configurable settings - modify values here directly"""
-    model: ModelConfig = field(default_factory=ModelConfig)
-    rag: RAGConfig = field(default_factory=RAGConfig)
-    max_conversation_turns: int = 10
-
-# ============================================
-# EDIT YOUR SETTINGS HERE
-# ============================================
-admin = AdminConfig(
-    model=ModelConfig(
-        temperature=0.7,
-        max_tokens=4096,
-        top_p=0.9
-    ),
-    rag=RAGConfig(
-        child_chunk_size=64,
-        parent_chunk_size=512,
-        top_k=10,
-        top_n=8,
-        compare_top_n=4,
-        compare_min_conf=0.70,
-        max_pdf_pages=150,
-    ),
-    max_conversation_turns=10
-)
 
 class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -63,25 +16,21 @@ class Config:
     EMAIL = os.getenv("EMAIL")  # For citeas.org, we use email as the identifier
     system_prompt = get_system_prompt()
 
-    # Model settings (from AdminConfig)
-    TEMPERATURE = admin.model.temperature
-    MAX_TOKENS = admin.model.max_tokens
-    TOP_P = admin.model.top_p
+    MAX_TOKENS = 4096
 
-    EMBED_DIM = 1536
+    # child = embed/retrieve; parent = LLM context / summarizer
+    CHILD_CHUNK_SIZE = 64
+    PARENT_CHUNK_SIZE = 512
+    TOP_K = 10
+    TOP_N = 8
+    COMPARE_TOP_N = 4
+    COMPARE_MIN_CONF = 0.70
+    MAX_PDF_PAGES = 150
 
-    # RAG defaults (child = embed/retrieve; parent = LLM context / summarizer)
-    CHILD_CHUNK_SIZE = admin.rag.child_chunk_size
-    PARENT_CHUNK_SIZE = admin.rag.parent_chunk_size
-    TOP_K = admin.rag.top_k
-    TOP_N = admin.rag.top_n
-    COMPARE_TOP_N = admin.rag.compare_top_n
-    COMPARE_MIN_CONF = admin.rag.compare_min_conf
     USE_GPU_ACCELERATION = should_use_acceleration()
-
-    # Conversation settings
-    MAX_CONVERSATION_TURNS = admin.max_conversation_turns
+    MAX_CONVERSATION_TURNS = 10
     HTTP_TIMEOUT = float(os.getenv("HTTP_TIMEOUT", 30.0))  # seconds
     DO_OCR = os.getenv("DO_OCR", "false").strip().lower() == "true"
+
 
 config = Config()
