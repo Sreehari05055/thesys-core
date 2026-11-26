@@ -4,17 +4,44 @@ from collections import defaultdict
 from functools import lru_cache
 import ftfy
 from cleantext import clean
-from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions,PictureDescriptionApiOptions, RapidOcrOptions,TableFormerMode
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling_rs import (
+    AcceleratorDevice,
+    AcceleratorOptions,
+    DocumentConverter,
+    InputFormat,
+    PdfFormatOption,
+    PdfPipelineOptions,
+    TableFormerMode,
+)
+from docling_parse.pdf_parser import ContentConfig, ContentLevel, DoclingPdfParser
+from docling_rs.options import PictureDescriptionApiOptions
 from docling_core.types.doc import CodeItem, DocItemLabel, PictureItem, SectionHeaderItem, TableItem
 from docling_core.types.doc.document import CodeItem
 from app import logger
-from pydantic import AnyUrl
 from app.core.config import config
 from docling_core.types.doc.base import BoundingBox, CoordOrigin
 from docling_core.types.doc.page import TextCellUnit
+
+# Lines only. Chars, words, shapes, and bitmaps are unused by the highlighter.
+_LINE_CELLS = ContentConfig(
+    char_cells_content_level=ContentLevel.SKIP,
+    word_cells_content_level=ContentLevel.SKIP,
+    line_cells_content_level=ContentLevel.COMPUTE_AND_MATERIALIZE,
+    shapes_content_level=ContentLevel.SKIP,
+    bitmaps_content_level=ContentLevel.SKIP,
+    include_bitmap_bytes=False,
+)
+
+
+def _line_pages(filepath, max_pages: int) -> dict:
+    pdf = DoclingPdfParser(loglevel="fatal").load(
+        str(filepath), lazy=True, content_config=_LINE_CELLS
+    )
+    n = pdf.number_of_pages()
+    if max_pages > 0:
+        n = min(n, max_pages)
+    return {i: pdf.get_page(i, content_config=_LINE_CELLS) for i in range(1, n + 1)}
+
 
 _SKIP_LABELS = frozenset(
     {
@@ -51,17 +78,19 @@ def _build_converter(offline: bool = False) -> DocumentConverter:
     opts = PdfPipelineOptions(
         do_ocr=config.DO_OCR,
         do_table_structure=True,
-        generate_parsed_pages=True,
         accelerator_options=accel,
     )
     if config.DO_OCR:
-        opts.ocr_options = RapidOcrOptions(backend="onnxruntime", lang=["english"])
+        # docling-rs reads ocr_options.lang; its OCR models are English and Chinese.
+        opts.ocr_options = type("OcrLang", (), {"lang": ["english"]})()
     opts.table_structure_options.mode = TableFormerMode.ACCURATE
     if not offline:
         opts.do_picture_description = True
         opts.enable_remote_services = True
+        # docling-rs hardcodes temperature 0. gpt-6-luna only accepts 1; this overwrites it.
+        os.environ.setdefault("DOCLING_RS_VLM_EXTRA_BODY", '{"temperature": 1}')
         opts.picture_description_options = PictureDescriptionApiOptions(
-            url=AnyUrl("https://api.openai.com/v1/chat/completions"),
+            url="https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
             params={
                 "model": "gpt-6-luna",
@@ -246,8 +275,8 @@ class PDFExtractor:
 
             page_data = defaultdict(lambda: {"elements": []})
             page_heights: dict[int, float] = {}
-            parsed_pages = {}
-            for page in result.pages:
+            parsed_pages = _line_pages(filepath, max_pages)
+            for page in doc.pages.values():
                 if page.size:
                     page_heights[page.page_no] = float(page.size.height)
                     page_data[page.page_no]["page_dimensions"] = {
@@ -255,9 +284,6 @@ class PDFExtractor:
                         "height": float(page.size.height),
                         "rotation": 0,
                     }
-                parsed = getattr(page, "parsed_page", None)
-                if parsed is not None:
-                    parsed_pages[page.page_no] = parsed
                     
             for item, _level in doc.iterate_items():
                 page_no = self._primary_page(item)
