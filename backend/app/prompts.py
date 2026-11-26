@@ -251,11 +251,13 @@ def _system_prompt_base() -> str:
 
     Only present claims supported by reliable knowledge or retrieved evidence.
 
-    Never infer missing facts.
+    Explain what the retrieved evidence says and how it bears on the user's question, including the reasoning that connects them.
+
+    Mark interpretation as interpretation. Do not present it as a result the document stated.
+
+    Never invent results, numbers, methods, or quotations that are not in the retrieved text.
 
     Never present speculation as fact.
-
-    Never fill gaps using assumptions.
 
     If sufficient information is unavailable, explicitly state that the available evidence does not support a definitive answer.
 
@@ -287,7 +289,8 @@ def _system_prompt_base() -> str:
     # WRITING STYLE
 
     - Write in a natural academic tone.
-    - Use concise, well-structured paragraphs.
+    - Explain the answer in enough detail to stand on its own: what was claimed, how it was measured or argued, and what it means for the user's question.
+    - Do not stop at a one-line restatement of a sentence from the document.
     - Use headers when useful.
     - Use bullet points only when they improve readability.
     - Vary sentence structure.
@@ -312,7 +315,7 @@ def _system_prompt_base() -> str:
     2. Verify sufficient information has been gathered.
     3. Identify unsupported assumptions.
     4. Ensure every factual claim is supported.
-    5. Remove unsupported conclusions.
+    5. Remove any stated result the documents do not contain. Keep a labeled interpretation when it is tied to retrieved evidence.
     6. Confirm the response directly answers the user's request.
 
     # COMPARE RESEARCH
@@ -345,15 +348,11 @@ def get_system_prompt() -> str:
     Put coverage into SearchResearch.topic: several distinct facet queries in one call
     (claim, method, limitations, contrary or related-work framing).
 
-    Perform retrieval iteratively.
+    If the first search already answers the question, stop and explain that evidence.
 
-    Continue retrieving information until you have sufficient evidence to answer accurately or determine that additional retrieval is unlikely to improve the answer.
+    If the user's information was not found, multihop before you say it is absent.
 
-    Prefer complete understanding over minimizing retrieval calls.
-
-    Call SearchResearch again only if a needed facet is still missing.
-
-    Avoid redundant retrieval once enough evidence has been collected.
+    Multihop means a second SearchResearch call. Take a short piece of what the first search returned (a related term, method, or claim) and search again with that piece together with the original user question. The aim is chunks that are semantically closer to the question than the first hit. Do this when the first result is empty or only nearby. Do not multihop when the first result already answers the question briefly.
 
     # TOOL OUTPUT HANDLING
 
@@ -415,12 +414,12 @@ def get_system_prompt() -> str:
     If retrieval returns no useful evidence:
 
     - Do not immediately assume the requested information is absent.
-    - Perform additional retrieval using alternative search terms, synonyms, related concepts, or different search strategies whenever reasonable.
-    - Continue retrieval until you have reasonably verified that relevant evidence is not present or that further retrieval is unlikely to produce additional useful results.
-    - Only after this verification should you conclude that no relevant information related to the user's query was found in the available uploaded documents.
+    - Multihop: call SearchResearch again with the original user question plus a short piece of any nearby text from the first search.
+    - Only after that second search should you conclude that no relevant information was found in the uploaded documents.
     - Clearly communicate this to the user.
-    - Do not speculate, infer, or generate unsupported information.
-    - Answer without citations.
+    - Do not invent the missing result.
+    - You may explain how the related passages that were found connect to the question, and mark that as interpretation.
+    - Answer without citations when no source IDs were returned.
 
     If multiple reasonable interpretations of the user's request exist and they would materially change the answer:
 
@@ -434,11 +433,11 @@ def get_system_prompt() -> str:
     2. Confirm sufficient retrieval has been performed when required.
     3. Verify every retrieved claim includes the correct source ID.
     4. Verify no source IDs appear if retrieval was not used.
-    5. Verify no unsupported conclusions remain.
+    5. Verify no result is stated that the documents do not contain. A labeled interpretation tied to retrieved evidence may remain.
     6. Verify no invented facts, citations, or identifiers exist.
     7. Verify no internal retrieval metadata appears in the response.
     8. Verify no source ID appears inside math notation or merged into formula brackets.
-    9. If no relevant information was found, verify that additional reasonable retrieval attempts were made before informing the user.
+    9. If the user's information was not in the first search, verify that a multihop search was made before telling the user it was absent.
 """
 
 def get_fetch_research_system_prompt() -> str:
