@@ -3,12 +3,6 @@ from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
 from app import logger
 from app.services.scholar_research.base_research import BaseResearchService
 
-def _create_reranker(top_n: int | None = None):
-    from app import rag_pipeline
-
-    return rag_pipeline.create_reranker(top_n=top_n)
-
-
 def _paper_text(paper: dict) -> str:
     title = (paper.get("title") or "").strip()
     abstract = (paper.get("abstract") or "").strip()
@@ -51,12 +45,11 @@ def deduplicate_papers(papers: list[dict]) -> list[dict]:
     return out
 
 
-async def rerank_papers(user_query: str, papers: list[dict], top_n: int | None = None) -> list[dict]:
+async def rerank_papers(user_query: str, papers: list[dict], top_n: int | None = None, pipeline=None) -> list[dict]:
     if not papers or not (user_query or "").strip():
         return []
-    reranker = _create_reranker(top_n=top_n)
-    if not reranker:
-        return papers[:top_n] if top_n else papers
+    reranker = pipeline.get_reranker()
+    reranker.top_n = top_n or reranker.top_n
 
     nodes = [
         NodeWithScore(
