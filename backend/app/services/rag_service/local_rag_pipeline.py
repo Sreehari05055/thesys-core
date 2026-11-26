@@ -197,6 +197,25 @@ class LocalRAGPipeline(BaseRAGPipeline):
 
         BaseRAGPipeline.session_indices[session_id] = await asyncio.to_thread(_work)
 
+    async def delete_doc_vectors(self, session_id: str, doc_ids: list[str]) -> None:
+        ids = list(dict.fromkeys(
+            unquote(d or "").strip().lower() for d in doc_ids if (d or "").strip()
+        ))
+        if not ids:
+            return
+
+        def _work():
+            try:
+                collection = self._client.get_collection(session_id)
+            except Exception:
+                return
+            where = {"doc_id": ids[0]} if len(ids) == 1 else {"doc_id": {"$in": ids}}
+            collection.delete(where=where)
+
+        await asyncio.to_thread(_work)
+        self._collections.pop(session_id, None)
+        BaseRAGPipeline.session_indices.pop(session_id, None)
+
     async def delete_session_vectors(self, session_id: str) -> None:
         BaseRAGPipeline.session_indices.pop(session_id, None)
         self._collections.pop(session_id, None)

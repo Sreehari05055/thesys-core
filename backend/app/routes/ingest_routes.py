@@ -212,10 +212,10 @@ async def delete_ingest_files(
 
     history_store = request.app.state.history_store
     deleted_chunk_ids = await history_store.delete_rag_file(session_id, doc_ids)
-    await request.app.state.rag_service.rag_pipeline.build_index(session_id)
+    await request.app.state.rag_service.rag_pipeline.delete_doc_vectors(session_id, doc_ids)
     deleted = list(dict.fromkeys(d.strip().lower() for d in doc_ids if (d or "").strip()))
     return JSONResponse(content={
-        "message": f"Deleted {len(deleted)} file(s) and rebuilt session index.",
+        "message": f"Deleted {len(deleted)} file(s).",
         "deleted_doc_ids": deleted,
         "deleted_chunk_ids": deleted_chunk_ids or [],
     })
