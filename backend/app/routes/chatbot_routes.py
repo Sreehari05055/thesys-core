@@ -1,5 +1,4 @@
 # app/routes/chatbot_routes.py
-import hashlib
 import os
 import io
 from typing import Annotated
@@ -16,6 +15,7 @@ import asyncio
 from fastapi.responses import FileResponse
 from app.services.chatbot_service import ChatbotService
 from app.routes.session_guard import session_dep, SESSION_HEADER
+from app.services.local_history_store import doc_id_for_filename
 from app.core.config import config
 from app.utils.pdf_url_verifier import download_pdf_from_url
 
@@ -243,7 +243,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
             return None
         for entry in await history_store.list_rag_files(session_id):
             filename = entry["filename"]
-            if hashlib.md5(filename.encode()).hexdigest() == needle:
+            if doc_id_for_filename(filename) == needle:
                 return filename
         return None
 
@@ -296,10 +296,10 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     ):
         """Table/code overlay regions for reader mode."""
         try:
-            filename = await _filename_for_doc_id(session_id, doc_id)
+            resolved = unquote(doc_id.strip()).lower()
+            filename = await _filename_for_doc_id(session_id, resolved)
             if not filename:
                 raise HTTPException(status_code=404, detail="Document not found in this session")
-            resolved = hashlib.md5(filename.encode()).hexdigest()
             regions = await rag_service.rag_pipeline.fetch_file_regions(session_id, resolved)
             return JSONResponse(content={"doc_id": resolved, "regions": regions})
         except HTTPException:
@@ -312,11 +312,6 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     async def get_session_file(
         doc_id: str,
         session_id: SessionId,
-        url: str | None = Query(
-            None,
-            min_length=1,
-            description="Verified pdf_url for an external paper; path id is paper id.",
-        ),
         page_number: int | None = Query(
             None,
             ge=1,
@@ -327,39 +322,8 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
             description="If true, return Content-Disposition attachment (save to disk). Default: inline view.",
         ),
     ):
-        """Serve ingested files by md5 ``doc_id``, or verified external PDFs when ``url`` is set."""
+        """Serve an ingested file by md5 ``doc_id``."""
         try:
-            if url:
-                stored_url = await history_store.get_verified_external_pdf_url(
-                    session_id,
-                    paper_id=doc_id,
-                    url=url,
-                )
-                if not stored_url:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="Verified PDF not found for this session.",
-                    )
-
-                body, _final_url, _ctype, reason = await download_pdf_from_url(
-                    stored_url,
-                    http_client=http_client,
-                )
-                if reason != "verified":
-                    raise HTTPException(
-                        status_code=_pdf_download_error_status(reason),
-                        detail={"error": reason, "url": stored_url},
-                    )
-
-                stem = os.path.basename(doc_id.replace("/", "_")) or "paper"
-                if page_number is not None:
-                    return _pdf_bytes_response(
-                        _pdf_page_bytes(body, page_number),
-                        f"{stem}_page_{page_number}.pdf",
-                        download=download,
-                    )
-                return _pdf_bytes_response(body, f"{stem}.pdf", download=download)
-
             filename = await _filename_for_doc_id(session_id, doc_id)
             if not filename:
                 raise HTTPException(status_code=404, detail="Document not found in this session")
@@ -395,6 +359,55 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
         except Exception as e:
             logger.error(
                 f"Error serving file doc_id={doc_id} session={session_id} page={page_number}: {e}",
+                exc_info=True,
+            )
+            return JSONResponse(content={"error": "Failed to serve file"}, status_code=500)
+
+    @chatbot_bp.get("/api/papers/{paper_id:path}")
+    async def get_external_paper_pdf(
+        paper_id: str,
+        session_id: SessionId,
+        url: str = Query(..., min_length=1, description="Verified pdf_url for this paper."),
+        page_number: int | None = Query(
+            None,
+            ge=1,
+            description="1-indexed PDF page. Omit to return the full file.",
+        ),
+        download: bool = Query(False),
+    ):
+        """Serve a verified external PDF. Path id is the paper id."""
+        try:
+            stored_url = await history_store.get_verified_external_pdf_url(
+                session_id,
+                paper_id=paper_id,
+                url=url,
+            )
+            if not stored_url:
+                raise HTTPException(status_code=404, detail="Verified PDF not found for this session.")
+
+            body, _final_url, _ctype, reason = await download_pdf_from_url(
+                stored_url,
+                http_client=http_client,
+            )
+            if reason != "verified":
+                raise HTTPException(
+                    status_code=_pdf_download_error_status(reason),
+                    detail={"error": reason, "url": stored_url},
+                )
+
+            stem = os.path.basename(paper_id.replace("/", "_")) or "paper"
+            if page_number is not None:
+                return _pdf_bytes_response(
+                    _pdf_page_bytes(body, page_number),
+                    f"{stem}_page_{page_number}.pdf",
+                    download=download,
+                )
+            return _pdf_bytes_response(body, f"{stem}.pdf", download=download)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error serving paper {paper_id} for session {session_id}: {e}",
                 exc_info=True,
             )
             return JSONResponse(content={"error": "Failed to serve file"}, status_code=500)
@@ -439,11 +452,10 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     ):
         """Summarize one indexed file by ``doc_id``. Requires ``X-Session-ID``."""
         try:
-            filename = await _filename_for_doc_id(session_id, doc_id)
+            resolved_doc_id = unquote(doc_id.strip()).lower()
+            filename = await _filename_for_doc_id(session_id, resolved_doc_id)
             if not filename:
                 raise HTTPException(status_code=404, detail="Document not found in this session")
-
-            resolved_doc_id = hashlib.md5(filename.encode()).hexdigest()
 
             session_settings = await history_store.get_settings(session_id)
             result = await summarizer_service.summarize(
