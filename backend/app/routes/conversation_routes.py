@@ -83,7 +83,7 @@ async def save_settings(request: Request, session_id: SessionId, settings_reques
         and settings.get("model") != current.get("model")
         and await store.has_messages(session_id)
     ):
-        raise HTTPException(status_code=400, detail="Model is fixed once the chat has started")
+        raise HTTPException(status_code=400, detail="Model is fixed once a question has been asked")
     model_row = await store.get_llm_model(settings.get("model"))
     if not model_row:
         raise HTTPException(status_code=400, detail="Unsupported model")

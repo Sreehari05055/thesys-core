@@ -151,7 +151,7 @@ class LocalHistoryStore():
 
     def _has_messages(self, session_id: str) -> bool:
         row = self._conn.execute(
-            "SELECT 1 FROM messages WHERE chat_id = ? LIMIT 1",
+            "SELECT 1 FROM messages WHERE chat_id = ? AND role = 'user' LIMIT 1",
             (session_id,),
         ).fetchone()
         return row is not None
