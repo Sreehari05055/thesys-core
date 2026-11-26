@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from typing import AsyncGenerator, List, Dict, Any
@@ -225,15 +226,19 @@ class ChatbotService:
             stored_msgs = await self.store.get_messages(session_id, include_sources=False)
             is_first_user_message = not any(m.get("role") == "user" for m in stored_msgs)
 
-            session_title = None
-            if is_first_user_message:
-                session_title = await self.title_service.generate_and_set_first_title(
-                    self.store,
-                    session_id,
-                    query,
-                    provider=search_params.get("provider"),
-                    model_name=search_params.get("model"),
+            title_task = (
+                asyncio.create_task(
+                    self.title_service.generate_and_set_first_title(
+                        self.store,
+                        session_id,
+                        query,
+                        provider=search_params.get("provider"),
+                        model_name=search_params.get("model"),
+                    )
                 )
+                if is_first_user_message
+                else None
+            )
 
             llm = get_llm(
                 provider=search_params.get("provider"),
@@ -262,9 +267,6 @@ class ChatbotService:
                 user_msg["active_documents"] = active_documents
             await self.store.add_message(session_id, user_msg)
             stored_msgs.append(user_msg)
-
-            if session_title:
-                yield f"data: {json.dumps({'session_title': session_title}, ensure_ascii=False)}\n\n"
 
             system_prompt = (
                 get_fetch_research_system_prompt()
@@ -468,6 +470,10 @@ class ChatbotService:
                     final_sources = pending_sources if pending_sources else None
                     await self.store.add_message(session_id, ai_msg_dict, sources=final_sources)
                     pending_sources = []
+                    if title_task is not None:
+                        title = await title_task
+                        if title:
+                            yield f"data: {json.dumps({'session_title': title}, ensure_ascii=False)}\n\n"
                     yield f"data: {json.dumps({'end': True, 'content_final': final_content}, ensure_ascii=False)}\n\n"
                     break
 
