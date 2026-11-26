@@ -25,6 +25,7 @@ async def load_conversation(request: Request, session_id: SessionId):
         "session_id": session_id,
         "title": title,
         "offline": bool(settings.get("offline")),
+        "model": settings.get("model") or "",
         "messages": messages,
     })
 
@@ -52,12 +53,22 @@ async def new_conversation(request: Request):
         pass
     if not config.OPENAI_API_KEY:
         offline = True
-    session_id = await request.app.state.history_store.create_session(offline=offline)
+    store = request.app.state.history_store
+    session_id = await store.create_session(offline=offline)
+    settings = await store.get_settings(session_id)
     return JSONResponse(content={
         "session_id": session_id,
         "offline": offline,
+        "model": settings.get("model") or "",
         "message": "New conversation created",
     })
+
+
+@router.get("/api/models")
+async def list_models(request: Request):
+    """Active chat models for the session dropdown."""
+    models = await request.app.state.history_store.list_llm_models()
+    return JSONResponse(content={"models": models})
 
 
 @router.post("/api/settings")
@@ -66,6 +77,13 @@ async def save_settings(request: Request, session_id: SessionId, settings_reques
     store = request.app.state.history_store
     settings = settings_request.model_dump(exclude_unset=True)
     title = settings.pop("title", None)
+    current = await store.get_settings(session_id)
+    if (
+        "model" in settings
+        and settings.get("model") != current.get("model")
+        and await store.has_messages(session_id)
+    ):
+        raise HTTPException(status_code=400, detail="Model is fixed once the chat has started")
     model_row = await store.get_llm_model(settings.get("model"))
     if not model_row:
         raise HTTPException(status_code=400, detail="Unsupported model")
