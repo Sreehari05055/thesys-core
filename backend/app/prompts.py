@@ -328,7 +328,7 @@ def _system_prompt_base() -> str:
 """
 
 
-def get_corpus_system_prompt() -> str:
+def get_system_prompt() -> str:
     return _system_prompt_base() + """
     # AVAILABLE TOOL
 
@@ -534,7 +534,3 @@ def get_fetch_research_system_prompt() -> str:
     6. Verify no unsupported conclusions remain.
     7. Verify no internal retrieval metadata is exposed.
 """
-
-def get_system_prompt() -> str:
-    """Default system prompt (corpus / SearchResearch mode)."""
-    return get_corpus_system_prompt()
