@@ -100,6 +100,13 @@ class LocalHistoryStore():
             out.append(item)
         return out
 
+    async def has_session(self, session_id: str) -> bool:
+        return await self._run(self._has_session, session_id)
+
+    def _has_session(self, session_id: str) -> bool:
+        row = self._conn.execute("SELECT 1 FROM chats WHERE id = ?", (session_id,)).fetchone()
+        return row is not None
+
     async def get_session_title(self, session_id: str) -> str:
         return await self._run(self._get_session_title, session_id)
 

@@ -2,7 +2,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from app import logger
-from app.routes.session_guard import SESSION_HEADER, owned_session_dep
+from app.routes.session_guard import SESSION_HEADER, session_dep
 from app.services.local_history_store import DocIdNotFoundError
 from app.utils.pdf_url_verifier import download_pdf_from_url
 from datetime import datetime
@@ -57,7 +57,7 @@ def _filename_from_url_source(source: dict, url: str, content_sha: str) -> str:
     return f"download_{content_sha[:8]}.pdf"
 
 def init_ingest_routes(app, history_store, citations_service, rag_service, http_client):
-    OwnedSession = Annotated[str, Depends(owned_session_dep(history_store))]
+    SessionId = Annotated[str, Depends(session_dep(history_store))]
     @ingest_bp.get("/api/ingest/files")
     async def list_ingest_files(
         request: Request,
@@ -87,7 +87,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
     @ingest_bp.post("/api/ingest")
     async def ingest_files(
         request: Request,
-        session_id: OwnedSession,
+        session_id: SessionId,
     ):
         """Upload files to the session RAG corpus. Requires ``X-Session-ID``."""
         try:
@@ -215,7 +215,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
     @ingest_bp.delete("/api/ingest/files")
     async def delete_ingest_files(
         request: Request,
-        session_id: OwnedSession,
+        session_id: SessionId,
     ):
         """Delete file(s) from the session RAG corpus. Requires ``X-Session-ID``.
 

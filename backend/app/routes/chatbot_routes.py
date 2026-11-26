@@ -15,14 +15,14 @@ from app.schemas.schemas import ChatRequest, SettingsRequest, CiteRequest, CiteE
 import asyncio
 from fastapi.responses import FileResponse
 from app.services.chatbot_service import ChatbotService
-from app.routes.session_guard import owned_session_dep, SESSION_HEADER
+from app.routes.session_guard import session_dep, SESSION_HEADER
 from app.core.config import config
 from app.utils.pdf_url_verifier import download_pdf_from_url
 
 chatbot_bp = APIRouter()
 
 def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_service, summarizer_service, scholar_service, citations_service):
-    OwnedSession = Annotated[str, Depends(owned_session_dep(history_store))]
+    SessionId = Annotated[str, Depends(session_dep(history_store))]
     chatbot_service = ChatbotService(
         system_prompt=system_prompt,
         store=history_store,
@@ -37,7 +37,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     async def get_bot_response(
         request: Request,
         chat_request: ChatRequest,
-        session_id: OwnedSession,
+        session_id: SessionId,
     ):
         try:
             session_settings = await history_store.get_settings(session_id)
@@ -103,7 +103,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
                 status_code=500
             )
     @chatbot_bp.get('/api/conversations/messages')
-    async def load_conversation(session_id: OwnedSession):
+    async def load_conversation(session_id: SessionId):
         """Get conversation messages. Requires ``X-Session-ID``."""
         try:
             messages = await history_store.get_messages(session_id)
@@ -124,7 +124,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
                 status_code=500
             )
     @chatbot_bp.delete('/api/conversations')
-    async def delete_conversation(session_id: OwnedSession):
+    async def delete_conversation(session_id: SessionId):
         """Delete session: messages, sources, summaries, vectors, bucket files, and chat row."""
         try:
             await rag_service.rag_pipeline.delete_session_vectors(session_id)
@@ -161,7 +161,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
             "message": "New conversation created",
         })
     @chatbot_bp.post("/api/settings")
-    async def save_settings(session_id: OwnedSession, settings_request: SettingsRequest):
+    async def save_settings(session_id: SessionId, settings_request: SettingsRequest):
         """Save per-conversation settings. Requires ``X-Session-ID``."""
         try:
             settings = settings_request.model_dump(exclude_unset=True)
@@ -192,7 +192,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
         ]
 
     @chatbot_bp.post("/api/cite")
-    async def get_citations(session_id: OwnedSession, cite_request: CiteRequest):
+    async def get_citations(session_id: SessionId, cite_request: CiteRequest):
         """Generate citations for one or more DOIs, arXiv IDs, or titles. Requires ``X-Session-ID``."""
         try:
             inputs = cite_request.citation_inputs
@@ -217,7 +217,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
             return JSONResponse(content={"error": "Failed to generate citations"}, status_code=500)
 
     @chatbot_bp.post("/api/cite/export")
-    async def export_citations(session_id: OwnedSession, cite_request: CiteExportRequest):
+    async def export_citations(session_id: SessionId, cite_request: CiteExportRequest):
         """Export BibTeX, RIS, enw, or CSV for one or more resources. Requires ``X-Session-ID``."""
         try:
             inputs = cite_request.citation_inputs
@@ -292,7 +292,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     @chatbot_bp.get("/api/files/{doc_id:path}/regions")
     async def get_session_file_regions(
         doc_id: str,
-        session_id: OwnedSession,
+        session_id: SessionId,
     ):
         """Table/code overlay regions for reader mode."""
         try:
@@ -311,7 +311,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     @chatbot_bp.get("/api/files/{doc_id:path}")
     async def get_session_file(
         doc_id: str,
-        session_id: OwnedSession,
+        session_id: SessionId,
         url: str | None = Query(
             None,
             min_length=1,
@@ -402,7 +402,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     @chatbot_bp.get("/api/summarize/saved/{summary_id}")
     async def get_saved_summary(
         summary_id: str,
-        session_id: OwnedSession,
+        session_id: SessionId,
     ):
         """Load one saved summary by ``summary_id``. Requires ``X-Session-ID``."""
         try:
@@ -421,7 +421,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
 
     @chatbot_bp.get("/api/summarize")
     async def list_session_summaries(
-        session_id: OwnedSession,
+        session_id: SessionId,
     ):
         """List saved summarize runs (metadata only). Requires ``X-Session-ID``."""
         try:
@@ -435,7 +435,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     async def summarize_session_file(
         request: Request,
         doc_id: str,
-        session_id: OwnedSession,
+        session_id: SessionId,
     ):
         """Summarize one indexed file by ``doc_id``. Requires ``X-Session-ID``."""
         try:
