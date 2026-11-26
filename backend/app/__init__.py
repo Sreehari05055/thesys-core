@@ -30,13 +30,13 @@ logger.setLevel(logging.DEBUG)
 from fastapi import FastAPI
 from app.core.config import config
 from app.core.init_db import ensure_local_db
-from app.services.rag_service.rag_factory import RAGProviderFactory
 from app.services.scholar_research.scholar_exec_service import ScholarExecutionService
 from app.services.citations_service.execution_service import CitationsExecutionService
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.rag_service.rag_execution_service import RAGExecutionService
 from app.services.summarizer_service.summarizer_execution import SummarizerExecutionService
+from app.services.rag_service.local_rag_pipeline import LocalRAGPipeline
 
 def create_app() -> FastAPI:
     
@@ -44,7 +44,7 @@ def create_app() -> FastAPI:
     from app.services.state_manager.local_history_store import LocalHistoryStore
     history_store = LocalHistoryStore()
     http_client = httpx.AsyncClient(timeout=config.HTTP_TIMEOUT)
-    rag_pipeline = RAGProviderFactory.get_provider()
+    rag_pipeline = LocalRAGPipeline()
     rag_service = RAGExecutionService(pipeline=rag_pipeline)
     summarizer_service = SummarizerExecutionService(pipeline=rag_pipeline, history_store=history_store)
     scholar_service = ScholarExecutionService(http_client=http_client, pipeline=rag_pipeline)
