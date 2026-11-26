@@ -12,6 +12,8 @@ export type Chat = {
   sessionId: string;
   /** Sticky session mode from backend chat config. */
   offline?: boolean;
+  /** Chat model id from backend chat config. */
+  model?: string;
 };
 
 /** Item from GET /api/conversations */
@@ -21,6 +23,7 @@ export type ConversationSummary = {
   created_at?: string;
   last_access?: string;
   offline?: boolean;
+  model?: string;
   /** Legacy shapes */
   sessionId?: string;
   id?: string;
@@ -33,6 +36,7 @@ export type ConversationLoadResponse = {
   session_id?: string;
   title?: string;
   offline?: boolean;
+  model?: string;
   messages?: unknown;
 };
 
