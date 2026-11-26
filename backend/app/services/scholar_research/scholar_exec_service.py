@@ -9,8 +9,9 @@ from app import logger
 class ScholarExecutionService(BaseResearchService):
     """Orchestrates external scholarly search providers for FetchResearch."""
 
-    def __init__(self, http_client=None):
+    def __init__(self, http_client=None, pipeline=None):
         self.http_client = http_client
+        self.pipeline = pipeline
         self._openalex = (
             OpenAlexResearchService(http_client=http_client)
             if getattr(config, "OPENALEX_API_KEY", None)
@@ -52,6 +53,7 @@ class ScholarExecutionService(BaseResearchService):
             user_query=query or "",
             papers=deduped,
             top_n=count,
+            pipeline=self.pipeline,
         )
         return reranked
 
