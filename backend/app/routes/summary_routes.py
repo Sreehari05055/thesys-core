@@ -53,14 +53,14 @@ async def summarize_session_file(request: Request, doc_id: str, session_id: Sess
 
     try:
         saved = await store.insert_document_summary(
-            chat_id=session_id,
+            session_id=session_id,
             doc_id=resolved_doc_id,
             filename=filename,
             chunks=[{"summary": result["summary"], "sources": result.get("sources", [])}],
         )
     except Exception as e:
         logger.error(
-            "document_summaries insert failed chat_id=%s doc_id=%s: %s",
+            "document_summaries insert failed session_id=%s doc_id=%s: %s",
             session_id,
             resolved_doc_id,
             e,

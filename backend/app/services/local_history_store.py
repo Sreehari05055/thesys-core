@@ -56,11 +56,11 @@ class LocalHistoryStore():
 
         return await asyncio.to_thread(_call)
 
-    def _touch(self, chat_id: str) -> None:
-        self._conn.execute("UPDATE chats SET updated_at = ? WHERE id = ?", (_now(), chat_id))
+    def _touch(self, session_id: str) -> None:
+        self._conn.execute("UPDATE chats SET updated_at = ? WHERE id = ?", (_now(), session_id))
 
-    def _file_path(self, chat_id: str, filename: str) -> str:
-        directory = os.path.join(self.files_root, chat_id, "source_files")
+    def _file_path(self, session_id: str, filename: str) -> str:
+        directory = os.path.join(self.files_root, session_id, "source_files")
         os.makedirs(directory, exist_ok=True)
         return os.path.join(directory, os.path.basename(filename))
 
@@ -68,7 +68,7 @@ class LocalHistoryStore():
         return await self._run(self._create_session, offline)
 
     def _create_session(self, offline: bool = False) -> str:
-        chat_id = str(uuid.uuid4())
+        session_id = str(uuid.uuid4())
         row = self._conn.execute(
             "SELECT provider, model FROM llm_models WHERE is_default = 1 AND is_active = 1"
         ).fetchone()
@@ -79,9 +79,9 @@ class LocalHistoryStore():
             "model": row["model"],
             "offline": bool(offline),
         })
-        self._conn.execute("INSERT INTO chats (id, config) VALUES (?, ?)", (chat_id, config))
+        self._conn.execute("INSERT INTO chats (id, config) VALUES (?, ?)", (session_id, config))
         self._conn.commit()
-        return chat_id
+        return session_id
 
     async def list_sessions(self, user_id=None) -> list[dict]:
         return await self._run(self._list_sessions)
@@ -518,16 +518,16 @@ class LocalHistoryStore():
         self._conn.commit()
         return chunk_ids
 
-    async def insert_document_summary(self, chat_id: str, doc_id: str, filename: str, chunks: list) -> dict:
-        return await self._run(self._insert_document_summary, chat_id, doc_id, filename, chunks)
+    async def insert_document_summary(self, session_id: str, doc_id: str, filename: str, chunks: list) -> dict:
+        return await self._run(self._insert_document_summary, session_id, doc_id, filename, chunks)
 
-    def _insert_document_summary(self, chat_id, doc_id, filename, chunks) -> dict:
+    def _insert_document_summary(self, session_id, doc_id, filename, chunks) -> dict:
         sid = str(uuid.uuid4())
         created = _now()
         self._conn.execute(
             "INSERT INTO document_summaries (id, chat_id, doc_id, filename, chunks, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (sid, chat_id, doc_id, filename, json.dumps(chunks), created, created),
+            (sid, session_id, doc_id, filename, json.dumps(chunks), created, created),
         )
         self._conn.commit()
         return {"id": sid, "created_at": created}
