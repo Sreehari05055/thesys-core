@@ -2,8 +2,8 @@ from app import logger
 from dotenv import load_dotenv
 import os
 from dataclasses import dataclass, field
-from app.prompts.prompts import get_system_prompt
-from app.core.hardware import HardwareDetector
+from app.prompts import get_system_prompt
+from app.core.hardware import should_use_acceleration
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -80,7 +80,7 @@ class Config:
         COMPARE_TOP_N = admin.rag.compare_top_n
         COMPARE_MIN_CONF = admin.rag.compare_min_conf
 
-        USE_GPU_ACCELERATION = HardwareDetector.should_use_acceleration()
+        USE_GPU_ACCELERATION = should_use_acceleration()
         
         # Conversation settings
         MAX_CONVERSATION_TURNS = admin.max_conversation_turns
