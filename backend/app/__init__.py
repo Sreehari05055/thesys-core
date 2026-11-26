@@ -38,17 +38,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.services.rag_service.rag_execution_service import RAGExecutionService
 from app.services.summarizer_service.summarizer_execution import SummarizerExecutionService
 
-rag_pipeline = RAGProviderFactory.get_provider()
-
 def create_app() -> FastAPI:
     
     ensure_local_db()
     from app.services.state_manager.local_history_store import LocalHistoryStore
     history_store = LocalHistoryStore()
     http_client = httpx.AsyncClient(timeout=config.HTTP_TIMEOUT)
+    rag_pipeline = RAGProviderFactory.get_provider()
     rag_service = RAGExecutionService(pipeline=rag_pipeline)
     summarizer_service = SummarizerExecutionService(pipeline=rag_pipeline, history_store=history_store)
-    scholar_service = ScholarExecutionService(http_client=http_client)
+    scholar_service = ScholarExecutionService(http_client=http_client, pipeline=rag_pipeline)
     citations_service = CitationsExecutionService(http_client=http_client)
 
     @asynccontextmanager
