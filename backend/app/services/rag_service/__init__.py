@@ -6,7 +6,6 @@ from app.services.rag_service.local_rag_pipeline import LocalRAGPipeline
 __all__ = [
     "RAGExecutionService",
     "ChunkingService",
-    "RAGProviderFactory",
     "BaseRAGPipeline",
     "LocalRAGPipeline",
 ]

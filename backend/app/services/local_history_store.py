@@ -64,7 +64,7 @@ class LocalHistoryStore():
         os.makedirs(directory, exist_ok=True)
         return os.path.join(directory, os.path.basename(filename))
 
-    async def create_session(self, user_id=None, offline: bool = False) -> str:
+    async def create_session(self, offline: bool = False) -> str:
         return await self._run(self._create_session, offline)
 
     def _create_session(self, offline: bool = False) -> str:
@@ -83,7 +83,7 @@ class LocalHistoryStore():
         self._conn.commit()
         return session_id
 
-    async def list_sessions(self, user_id=None) -> list[dict]:
+    async def list_sessions(self) -> list[dict]:
         return await self._run(self._list_sessions)
 
     def _list_sessions(self) -> list[dict]:
@@ -391,7 +391,7 @@ class LocalHistoryStore():
         self._conn.commit()
         shutil.rmtree(os.path.join(self.files_root, session_id), ignore_errors=True)
 
-    async def list_rag_files(self, session_id=None, *, user_id=None) -> list[dict]:
+    async def list_rag_files(self, session_id=None) -> list[dict]:
         return await self._run(self._list_rag_files, session_id)
 
     def _list_rag_files(self, session_id) -> list[dict]:
