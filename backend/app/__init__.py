@@ -3,7 +3,6 @@ import logging
 from contextlib import asynccontextmanager
 import httpx
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app_errors.log')
 _DEFAULT_CORS_ORIGINS = (
     "http://127.0.0.1:5000,http://localhost:5000,http://localhost:3000,http://localhost:5173"
