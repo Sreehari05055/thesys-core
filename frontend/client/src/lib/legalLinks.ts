@@ -1,17 +1,11 @@
-﻿/** In-app legal pages (static). Override with env for hosted PDFs/HTML later if needed. */
+﻿/** In-app terms page. Override with env for a hosted page. */
 const TERMS_OF_SERVICE_PATH = "/terms";
-const PRIVACY_POLICY_PATH = "/privacy";
 
 const termsUrlEnv = (import.meta.env.VITE_TERMS_URL as string | undefined)?.trim();
-const privacyUrlEnv = (import.meta.env.VITE_PRIVACY_URL as string | undefined)?.trim();
 
-/** External URL when set; otherwise same-origin path for in-app pages. */
+/** External URL when set; otherwise the in-app terms page. */
 export function termsHref(): string {
   return termsUrlEnv || TERMS_OF_SERVICE_PATH;
-}
-
-export function privacyHref(): string {
-  return privacyUrlEnv || PRIVACY_POLICY_PATH;
 }
 
 export function isExternalLegalUrl(href: string): boolean {

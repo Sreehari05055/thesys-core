@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { SummaryMarkdownBody } from "@/components/SummaryMarkdownBody";
 import type { Source } from "@/lib/chatMessages";
 import type { DocumentSummary } from "@/lib/documentSummary";

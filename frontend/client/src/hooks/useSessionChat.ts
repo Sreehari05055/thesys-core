@@ -14,7 +14,6 @@ import {
   normalizeChatSources,
   updateLastBotMessage,
   type ChatMessage,
-  type Source,
 } from "@/lib/chatMessages";
 import { getCachedSessionMessages } from "@/lib/chatStorage";
 import {

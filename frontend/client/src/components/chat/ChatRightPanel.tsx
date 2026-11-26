@@ -166,7 +166,6 @@ export function ChatRightPanel({ model, intelPanelRef }: ChatRightPanelProps) {
     rightPanelTab,
     setRightPanelTab,
     setShowRightPanel,
-    messages,
     leftPanelMode,
     documentSummary,
     showPDF,
