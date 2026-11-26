@@ -1,4 +1,3 @@
-from app import logger
 from dotenv import load_dotenv
 import os
 from dataclasses import dataclass, field
@@ -62,32 +61,27 @@ class Config:
     OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY")
     TYPESAFE_API_KEY = os.getenv("TYPESAFE_API_KEY")
     EMAIL = os.getenv("EMAIL")  # For citeas.org, we use email as the identifier
-    try:
-        system_prompt = get_system_prompt()
+    system_prompt = get_system_prompt()
 
-        # Model settings (from AdminConfig)
-        TEMPERATURE = admin.model.temperature
-        MAX_TOKENS = admin.model.max_tokens
-        TOP_P = admin.model.top_p
+    # Model settings (from AdminConfig)
+    TEMPERATURE = admin.model.temperature
+    MAX_TOKENS = admin.model.max_tokens
+    TOP_P = admin.model.top_p
 
-        EMBED_DIM = 1536
+    EMBED_DIM = 1536
 
-        # RAG defaults (child = embed/retrieve; parent = LLM context / summarizer)
-        CHILD_CHUNK_SIZE = admin.rag.child_chunk_size
-        PARENT_CHUNK_SIZE = admin.rag.parent_chunk_size
-        TOP_K = admin.rag.top_k
-        TOP_N = admin.rag.top_n
-        COMPARE_TOP_N = admin.rag.compare_top_n
-        COMPARE_MIN_CONF = admin.rag.compare_min_conf
+    # RAG defaults (child = embed/retrieve; parent = LLM context / summarizer)
+    CHILD_CHUNK_SIZE = admin.rag.child_chunk_size
+    PARENT_CHUNK_SIZE = admin.rag.parent_chunk_size
+    TOP_K = admin.rag.top_k
+    TOP_N = admin.rag.top_n
+    COMPARE_TOP_N = admin.rag.compare_top_n
+    COMPARE_MIN_CONF = admin.rag.compare_min_conf
+    USE_GPU_ACCELERATION = should_use_acceleration()
 
-        USE_GPU_ACCELERATION = should_use_acceleration()
-        
-        # Conversation settings
-        MAX_CONVERSATION_TURNS = admin.max_conversation_turns
-        HTTP_TIMEOUT = float(os.getenv("HTTP_TIMEOUT", 30.0))  # seconds
-        DO_OCR = os.getenv("DO_OCR", "false").strip().lower() == "true"
-    except Exception as e:
-        logger.error(f"Error in configuration: {e}")
-        raise RuntimeError(f"Error in configuration: {e}") from e
+    # Conversation settings
+    MAX_CONVERSATION_TURNS = admin.max_conversation_turns
+    HTTP_TIMEOUT = float(os.getenv("HTTP_TIMEOUT", 30.0))  # seconds
+    DO_OCR = os.getenv("DO_OCR", "false").strip().lower() == "true"
 
 config = Config()
