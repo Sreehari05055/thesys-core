@@ -98,6 +98,7 @@ class LocalHistoryStore():
             except Exception:
                 cfg = {}
             item["offline"] = bool(cfg.get("offline"))
+            item["model"] = cfg.get("model") or ""
             out.append(item)
         return out
 
@@ -145,6 +146,16 @@ class LocalHistoryStore():
         self._conn.commit()
         return title if cur.rowcount else None
 
+    async def has_messages(self, session_id: str) -> bool:
+        return await self._run(self._has_messages, session_id)
+
+    def _has_messages(self, session_id: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM messages WHERE chat_id = ? LIMIT 1",
+            (session_id,),
+        ).fetchone()
+        return row is not None
+
     async def get_settings(self, session_id: str) -> dict:
         return await self._run(self._get_settings, session_id)
 
@@ -167,6 +178,25 @@ class LocalHistoryStore():
             (json.dumps(merged), _now(), session_id),
         )
         self._conn.commit()
+
+    async def list_llm_models(self) -> list[dict]:
+        return await self._run(self._list_llm_models)
+
+    def _list_llm_models(self) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT model FROM llm_models WHERE is_active = 1 ORDER BY model"
+        ).fetchall()
+        order = (
+            "gpt-5.6-luna",
+            "gpt-6-luna",
+            "gpt-6.1-terra",
+            "gpt-6.2-sol",
+            "gpt-6.2-astra",
+        )
+        rank = {name: i for i, name in enumerate(order)}
+        names = [row["model"] for row in rows]
+        names.sort(key=lambda name: (rank.get(name, len(order)), name))
+        return [{"model": name} for name in names]
 
     async def get_llm_model(self, model_name: str):
         return await self._run(self._get_llm_model, model_name)
