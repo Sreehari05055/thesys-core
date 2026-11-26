@@ -40,47 +40,6 @@ def is_valid_highlight_bbox(
             return False
         return True
 
-
-def page_dimensions_from_bboxes(
-    pages: Optional[List[Any]], bboxes: Optional[List[Any]]
-) -> List[dict]:
-    """Per-page width/height/rotation from chunk ``bboxes`` (same fields as ingest chunking)."""
-    dims_by_page: dict[Any, dict] = {}
-    for entry in bboxes or []:
-        if not isinstance(entry, dict):
-            continue
-        page = entry.get("page")
-        if page is None or page in dims_by_page:
-            continue
-        dims_by_page[page] = {
-            "page": page,
-            "page_width": entry.get("page_width"),
-            "page_height": entry.get("page_height"),
-            "page_rotation": entry.get("page_rotation", 0),
-        }
-    ordered_pages = list(pages) if pages else sorted(
-        dims_by_page.keys(), key=lambda x: (not isinstance(x, (int, float)), x)
-    )
-    out: List[dict] = []
-    seen: set[Any] = set()
-    for p in ordered_pages:
-        if p in dims_by_page and p not in seen:
-            out.append(dims_by_page[p])
-            seen.add(p)
-    for p in sorted(dims_by_page.keys(), key=lambda x: (not isinstance(x, (int, float)), x)):
-        if p not in seen:
-            out.append(dims_by_page[p])
-    return out
-
-
-def primary_page_fields(page_dimensions: List[dict]) -> tuple[Any, Any, Any]:
-    """Top-level ``page`` / ``page_width`` / ``page_height`` when the chunk spans one page."""
-    if len(page_dimensions) == 1:
-        d = page_dimensions[0]
-        return d.get("page"), d.get("page_width"), d.get("page_height")
-    return None, None, None
-
-
 def filter_highlight_bboxes(bboxes: Optional[List[Any]]) -> List[Any]:
     """Drop invalid or near-full-page boxes before returning to the client."""
     if not bboxes:
