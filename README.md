@@ -8,9 +8,9 @@
 
 </div>
 
-Local research workspace: search open-access papers (OpenAlex and arXiv), upload PDFs, ask questions with on-page highlights, compare two papers on a claim, and export citations.
+Research workspace: search open-access papers (OpenAlex and arXiv), upload PDFs, ask questions with on-page highlights, compare two papers on a claim, and export citations.
 
-Papers, embeddings, and chat history stay on disk. Citations jump to the PDF. Chat needs an OpenAI API key; pairwise compare uses [TypeSafe](https://typesafe.ai) Jev. Ingest and retrieval run locally (Docling, Chroma, BGE).
+Citations jump to the PDF. Chat needs an OpenAI API key; pairwise compare uses [TypeSafe](https://typesafe.ai) Jev.
 
 Copy `backend/.env.example` to `backend/.env`, set `OPENAI_API_KEY`, `EMAIL`, and `TYPESAFE_API_KEY` (compare), then:
 
@@ -58,16 +58,16 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000). First build is large; first
 
 - **Frontend:** React (Vite) on port `5000`
 - **Backend:** FastAPI on port `8000`
-- **Local RAG:** Docling ingest → Chroma + BGE embeddings → BGE reranker
+- **RAG:** Docling ingest → Chroma + BGE embeddings → BGE reranker
 - **OCR:** off by default (`DO_OCR=false`); set `DO_OCR=true` for scanned PDFs
 - **Chat:** OpenAI via LangChain
 - **Compare:** TypeSafe Jev (`TYPESAFE_API_KEY`)
 - **Paper search:** OpenAlex + arXiv (open-access; optional OpenAlex API key)
 - **Citations:** CiteAs (uses `EMAIL`)
 
-PDFs, vectors, and chat history stay on disk under `backend/data/`. First ingest downloads embedding/rerank weights (Hugging Face). GPU helps; CPU works and is slower.
+App data is under `backend/data/`. First ingest downloads embedding/rerank weights (Hugging Face). GPU helps; CPU works and is slower.
 
-## Local setup
+## Without Docker
 
 Needs Python 3.11+, Node.js 20+, and an OpenAI API key (or use Docker above).
 
@@ -97,11 +97,6 @@ npm run dev
 ```
 
 Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The UI talks to `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`).
-
-## Later
-
-- [ ] Optional Cohere embeddings and reranker for users who want higher retrieval quality. Local BGE stays the default.
-- [ ] Per-chat settings: saved title, selected model, and reasoning effort.
 
 ## License
 
