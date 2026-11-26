@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
-from app.core.config import config
 
 class SearchResearch(BaseModel):
     """
@@ -21,15 +20,6 @@ class SearchResearch(BaseModel):
     question: str = Field(description=(        
         "A minimally normalized version of the original question "
         "(e.g., resolving pronouns), without changing scope or intent."))
-    top_n: Optional[int] = Field(
-        default=None,
-        ge=2,
-        le=config.TOP_N,
-        description=(
-            f"Chunks to keep after reranking (2-{config.TOP_N}). "
-            f"Omit to retrieve up to {config.TOP_N} chunks."
-        ),
-    )
 
 class CompareResearch(BaseModel):
     """
