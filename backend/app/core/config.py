@@ -21,7 +21,7 @@ class Config:
     # child = embed/retrieve; parent = LLM context / summarizer
     CHILD_CHUNK_SIZE = 64
     PARENT_CHUNK_SIZE = 512
-    TOP_K = 10
+    TOP_K = 30
     TOP_N = 8
     COMPARE_TOP_N = 4
     COMPARE_MIN_CONF = 0.70
