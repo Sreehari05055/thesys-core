@@ -13,7 +13,7 @@ from app.prompts.prompts import (
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage, BaseMessage
 
 class ChatbotService:
-    def __init__(self, system_prompt: str, store, http_client, rag_service=None, summarizer_service=None, scholar_service=None):
+    def __init__(self, system_prompt: str, store, rag_service=None,scholar_service=None):
         from app.services.langchain_handler.tool_executor import ToolExecutor
         self.system_prompt = system_prompt
         self.store = store
