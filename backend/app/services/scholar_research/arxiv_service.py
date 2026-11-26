@@ -89,7 +89,7 @@ class ArxivResearchService(BaseResearchService):
             )
         return rows
 
-    async def semantic_scholar_search(
+    async def search_papers(
         self,
         query=None,
         arxiv_id=None,

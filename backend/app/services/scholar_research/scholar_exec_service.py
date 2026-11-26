@@ -19,21 +19,21 @@ class ScholarExecutionService(BaseResearchService):
         )
         self._arxiv = ArxivResearchService(http_client=http_client)
 
-    async def semantic_scholar_search(self, query=None, **kwargs):
+    async def search_papers(self, query=None, **kwargs):
         if kwargs.get("arxiv_id"):
-            return await self._arxiv.semantic_scholar_search(query=query, **kwargs)
+            return await self._arxiv.search_papers(query=query, **kwargs)
 
         openalex_kwargs = {k: v for k, v in kwargs.items() if k != "arxiv_id"}
 
         if kwargs.get("doi") or kwargs.get("pmid"):
             if not self._openalex:
                 return "External research service is not configured."
-            return await self._openalex.semantic_scholar_search(query=query, **openalex_kwargs)
+            return await self._openalex.search_papers(query=query, **openalex_kwargs)
 
         tasks = []
         if self._openalex:
-            tasks.append(self._openalex.semantic_scholar_search(query=query, **openalex_kwargs))
-        tasks.append(self._arxiv.semantic_scholar_search(query=query, **kwargs))
+            tasks.append(self._openalex.search_papers(query=query, **openalex_kwargs))
+        tasks.append(self._arxiv.search_papers(query=query, **kwargs))
 
         raw = await asyncio.gather(*tasks)
         merged = []
@@ -58,7 +58,7 @@ class ScholarExecutionService(BaseResearchService):
         return reranked
 
     async def fetch_research(self, query, **kwargs) -> dict:
-        results = await self.semantic_scholar_search(query, **kwargs)
+        results = await self.search_papers(query, **kwargs)
         if isinstance(results, str):
             return {"error": results, "papers": [], "context_text": ""}
         papers = [self.paper_to_frontend(r) for r in results]

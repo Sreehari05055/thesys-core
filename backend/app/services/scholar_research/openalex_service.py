@@ -11,7 +11,7 @@ class OpenAlexResearchService(BaseResearchService):
         self.http_client = http_client
         self.works_url = "https://api.openalex.org/works" 
 
-    async def semantic_scholar_search(
+    async def search_papers(
         self,
         query=None,
         doi=None,
