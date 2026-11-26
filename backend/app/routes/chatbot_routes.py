@@ -130,7 +130,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
     async def delete_conversation(session_id: OwnedSession):
         """Delete session: messages, sources, summaries, vectors, bucket files, and chat row."""
         try:
-            await rag_service.clear_session_vectors(session_id)
+            await rag_service.rag_pipeline.delete_session_vectors(session_id)
             await history_store.clear_session(session_id)
             
             return JSONResponse(content={
@@ -303,7 +303,7 @@ def init_chatbot_routes(app, system_prompt, history_store, http_client, rag_serv
             if not filename:
                 raise HTTPException(status_code=404, detail="Document not found in this session")
             resolved = hashlib.md5(filename.encode()).hexdigest()
-            regions = await rag_service.fetch_file_regions(session_id, resolved)
+            regions = await rag_service.rag_pipeline.fetch_file_regions(session_id, resolved)
             return JSONResponse(content={"doc_id": resolved, "regions": regions})
         except HTTPException:
             raise

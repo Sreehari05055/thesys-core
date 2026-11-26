@@ -188,7 +188,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
                     )
 
             saved_paths = list(dict.fromkeys(saved_paths))
-            await rag_service.add_to_index(session_id, saved_paths, offline=offline)
+            await rag_service.rag_pipeline.add_to_index(session_id, saved_paths, offline=offline)
 
             names = sorted({os.path.basename(p) for p in saved_paths})
             await history_store.add_message(session_id, {
@@ -227,7 +227,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
             doc_ids = [raw] if isinstance(raw, str) else list(raw or [])
 
             deleted_chunk_ids = await history_store.delete_rag_file(session_id, doc_ids)
-            await rag_service.rebuild_index(session_id)
+            await rag_service.rag_pipeline.build_index(session_id)
             deleted = list(dict.fromkeys(d.strip().lower() for d in doc_ids if (d or "").strip()))
             return JSONResponse(content={
                 "message": f"Deleted {len(deleted)} file(s) and rebuilt session index.",
