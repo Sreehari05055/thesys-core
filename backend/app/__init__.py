@@ -31,7 +31,7 @@ from fastapi import FastAPI
 from app.core.config import config
 from app.core.init_db import ensure_local_db
 from app.services.scholar_research.scholar_exec_service import ScholarExecutionService
-from app.services.execution_service import CitationsExecutionService
+from app.services.citations import CitationsService
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.rag_service.rag_execution_service import RAGExecutionService
@@ -48,7 +48,7 @@ def create_app() -> FastAPI:
     rag_service = RAGExecutionService(pipeline=rag_pipeline)
     summarizer_service = SummarizerService(pipeline=rag_pipeline)
     scholar_service = ScholarExecutionService(http_client=http_client, pipeline=rag_pipeline)
-    citations_service = CitationsExecutionService(http_client=http_client)
+    citations_service = CitationsService(http_client=http_client)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
