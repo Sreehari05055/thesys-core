@@ -41,7 +41,7 @@ from app.services.rag_service.local_rag_pipeline import LocalRAGPipeline
 def create_app() -> FastAPI:
     
     ensure_local_db()
-    from app.services.state_manager.local_history_store import LocalHistoryStore
+    from app.services.local_history_store import LocalHistoryStore
     history_store = LocalHistoryStore()
     http_client = httpx.AsyncClient(timeout=config.HTTP_TIMEOUT)
     rag_pipeline = LocalRAGPipeline()

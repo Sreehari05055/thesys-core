@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from app import logger
 from app.routes.session_guard import SESSION_HEADER, owned_session_dep
-from app.services.state_manager.base_history import DocIdNotFoundError
+from app.services.local_history_store import DocIdNotFoundError
 from app.utils.pdf_url_verifier import download_pdf_from_url
 from datetime import datetime
 import hashlib

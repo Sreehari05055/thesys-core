@@ -11,7 +11,6 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from app.core.init_db import DEFAULT_DB_PATH
-from app.services.state_manager.base_history import BaseHistoryStore, DocIdNotFoundError
 
 DEFAULT_TITLE = "New Chat"
 
@@ -33,7 +32,14 @@ def _pack_content(message: dict) -> str:
 def _dumps(value):
     return json.dumps(value) if value is not None else None
 
-class LocalHistoryStore(BaseHistoryStore):
+class DocIdNotFoundError(LookupError):
+    """Raised when one or more ingest doc_ids are not in the session corpus."""
+
+    def __init__(self, doc_ids: list[str]):
+        self.doc_ids = doc_ids
+        super().__init__("doc_id_not_found")
+
+class LocalHistoryStore():
     def __init__(self, db_path: str | None = None):
         self.db_path = db_path or DEFAULT_DB_PATH
         self.files_root = os.path.join(os.path.dirname(self.db_path), "sessions")
