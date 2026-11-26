@@ -85,4 +85,10 @@ export const API_URLS = {
   ingestFiles: `${config.apiBaseUrl}/api/ingest/files`,
 
   newConversation: `${config.apiBaseUrl}/api/conversations/new`,
+
+  /** GET — active chat models. */
+  models: `${config.apiBaseUrl}/api/models`,
+
+  /** POST — `{ model }`. Requires `X-Session-ID`. */
+  saveSettings: `${config.apiBaseUrl}/api/settings`,
 } as const;
