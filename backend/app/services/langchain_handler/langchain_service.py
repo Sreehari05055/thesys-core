@@ -12,5 +12,5 @@ def get_llm(provider: str = None, model_name: str = None) -> BaseChatModel:
         api_key=config.OPENAI_API_KEY,
         max_tokens=config.MAX_TOKENS,
         use_responses_api=True,
-        reasoning_effort="low",
+        reasoning_effort="medium",
     )
