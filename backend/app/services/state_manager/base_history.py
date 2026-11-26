@@ -40,12 +40,12 @@ class BaseHistoryStore(ABC):
         pass
     
     @abstractmethod
-    async def create_session(self, user_id: Optional[str] = None, offline: bool = False) -> str:
+    async def create_session(self, offline: bool = False) -> str:
         """Create a new session, optionally bound to a user. Returns the session_id."""
         pass
 
     @abstractmethod
-    async def list_sessions(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def list_sessions(self) -> List[Dict[str, Any]]:
         """Return sessions for the given user (or all if user_id is None)."""
         pass
 
@@ -53,8 +53,6 @@ class BaseHistoryStore(ABC):
     async def list_rag_files(
         self,
         session_id: Optional[str] = None,
-        *,
-        user_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """List RAG corpus files for one session or for all sessions owned by ``user_id``."""
         pass
