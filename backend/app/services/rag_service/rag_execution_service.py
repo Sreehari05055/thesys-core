@@ -27,9 +27,8 @@ class RAGExecutionService:
     async def _chunks_for_doc(self, queries, user_query, session_id, search_params, doc_id):
         params = dict(search_params)
         params["doc_ids"] = [doc_id]
-        params["top_n"] = config.COMPARE_TOP_N
         return await self.rag_pipeline._get_corpus_data(
-            queries, user_query, session_id, search_params=params
+            queries, user_query, session_id, search_params=params, top_n=config.COMPARE_TOP_N
         )
 
     async def search_corpus(self, queries: list[str], user_query: str, session_id: str, search_params=None):

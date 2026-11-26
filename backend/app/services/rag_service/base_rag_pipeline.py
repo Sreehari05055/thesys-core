@@ -30,12 +30,12 @@ class BaseRAGPipeline:
         user_query: str,
         session_id: str,
         search_params: Dict[str, Any],
+        top_n: int,
     ) -> list:
         """
         Vector search + rerank using ``session_indices[session_id]`` (caller must set index).
         """
         top_k = search_params.get("top_k") or self.config.TOP_K
-        top_n = search_params.get("top_n") or self.config.TOP_N
         doc_ids = search_params.get("doc_ids") or []
 
         index = BaseRAGPipeline.session_indices[session_id]
@@ -126,11 +126,9 @@ class BaseRAGPipeline:
             return max_score - (score_range * 0.6)
         return 0.10
 
-    async def _global_reranker(self, content: list, user_query: str, top_n: int = None):
+    async def _global_reranker(self, content: list, user_query: str, top_n: int):
         """Rerank retrieved nodes; shared across backends."""
-        if top_n is None:
-            top_n = self.config.TOP_N
-        reranker = self.create_reranker(top_n=top_n)
+        reranker = self.create_reranker(top_n)
         reranked_nodes = await asyncio.to_thread(
             reranker.postprocess_nodes,
             content,

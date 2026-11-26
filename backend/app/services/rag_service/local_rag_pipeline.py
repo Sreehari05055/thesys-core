@@ -137,8 +137,8 @@ class LocalRAGPipeline(BaseRAGPipeline):
     def get_reranker(self):
         return self.reranker
 
-    def create_reranker(self, top_n: int | None = None):
-        self.reranker.top_n = top_n or self.config.TOP_N
+    def create_reranker(self, top_n: int):
+        self.reranker.top_n = top_n
         return self.reranker
 
     def _files_dir(self, session_id: str) -> str:
@@ -237,7 +237,7 @@ class LocalRAGPipeline(BaseRAGPipeline):
         return self._fill_parent_text(session_id, rows)
 
     async def _get_corpus_data(
-        self, questions: List[str], user_query: str, session_id: str, search_params=None
+        self, questions: List[str], user_query: str, session_id: str, search_params=None, top_n: int = config.TOP_N
     ) -> list:
         search_params = search_params or {}
         source_ids = search_params.get("source_ids")
@@ -245,7 +245,7 @@ class LocalRAGPipeline(BaseRAGPipeline):
             return self._chunks_by_ids(session_id, source_ids)
         await self._load_index(session_id)
         rows = await self._retrieve_from_session_index(
-            questions, user_query, session_id, search_params
+            questions, user_query, session_id, search_params, top_n
         )
         return self._fill_parent_text(session_id, rows)
 
