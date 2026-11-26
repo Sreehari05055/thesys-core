@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from app import logger
 from app.routes.session_guard import SESSION_HEADER, session_dep
-from app.services.local_history_store import DocIdNotFoundError
+from app.services.local_history_store import DocIdNotFoundError, doc_id_for_filename
 from app.utils.pdf_url_verifier import download_pdf_from_url
 from datetime import datetime
 import hashlib
@@ -12,11 +12,6 @@ import re
 from urllib.parse import urlparse
 
 ingest_bp = APIRouter()
-
-def _doc_id_for_filename(filename: str) -> str:
-    """Stable document id (same as RAG ingest and ``GET /api/files/{doc_id}``)."""
-    name = os.path.basename((filename or "").strip())
-    return hashlib.md5(name.encode()).hexdigest() if name else ""
 
 def _allocate_unique_filename(reserved: set[str], desired: str) -> str:
     """Pick a ``file_name`` not in ``reserved`` (e.g. ``report.pdf`` → ``report (1).pdf``)."""
@@ -71,7 +66,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
             for f in files:
                 name = os.path.basename(str(f.get("filename") or "").strip())
                 f["filename"] = name
-                f["doc_id"] = _doc_id_for_filename(name)
+                f["doc_id"] = doc_id_for_filename(name)
                 f["metadata"] = {
                     "identifier": None,
                     "verified": False,
@@ -203,7 +198,7 @@ def init_ingest_routes(app, history_store, citations_service, rag_service, http_
             return JSONResponse(content={
                 "message": f"Successfully ingested {len(saved_paths)} file(s) and updated session index.",
                 "ingested": names,
-                "files": [{"filename": n, "doc_id": _doc_id_for_filename(n)} for n in names],
+                "files": [{"filename": n, "doc_id": doc_id_for_filename(n)} for n in names],
                 "skipped_duplicate_content": skipped,
             })
         except HTTPException:

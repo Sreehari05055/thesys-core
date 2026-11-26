@@ -1,5 +1,5 @@
 import os
-import hashlib
+from app.services.local_history_store import doc_id_for_filename
 from app.services.parser.pdf_parser import PDFExtractor
 from app import logger
 
@@ -26,7 +26,7 @@ def iter_documents(data_dir: str, file_paths: list = None, offline: bool = False
 
             raw_meta = raw_data["metadata"]
             yield {
-                "id": hashlib.md5(filename.encode()).hexdigest(),
+                "id": doc_id_for_filename(filename),
                 "title": raw_data["title"],
                 "page_data": raw_data["page_data"],
                 "metadata": {
