@@ -62,9 +62,3 @@ class ScholarExecutionService(BaseResearchService):
         papers = [self.paper_to_frontend(r) for r in results]
         context_text = "\n\n".join(self._format_paper_for_llm(r) for r in results)
         return {"papers": papers, "context_text": context_text}
-
-    async def get_formatted_search_results(self, query, **kwargs) -> str:
-        payload = await self.fetch_research(query, **kwargs)
-        if payload.get("error"):
-            return payload["error"]
-        return payload.get("context_text") or ""
