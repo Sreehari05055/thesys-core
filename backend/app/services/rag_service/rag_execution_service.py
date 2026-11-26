@@ -14,25 +14,6 @@ class RAGExecutionService:
     def __init__(self, pipeline=None):
         self.rag_pipeline = pipeline
 
-    async def init_index(self, session_id: str):
-        """Initial load of the index for a session."""
-        await self.rag_pipeline._load_index(session_id)
-
-    async def rebuild_index(self, session_id: str):
-        """Full wipe and rebuild of the index for a specific session."""
-        await self.rag_pipeline._build_index(session_id)
-
-    async def add_to_index(self, session_id: str, file_paths: list[str], offline: bool = False):
-        """Incrementally add new files to an existing index without rebuilding."""
-        await self.rag_pipeline._add_to_index(session_id, file_paths, offline=offline)
-
-    async def clear_session_vectors(self, session_id: str) -> None:
-        """Delete all embedding rows for a session."""
-        await self.rag_pipeline.delete_session_vectors(session_id)
-
-    async def fetch_file_regions(self, session_id: str, doc_id: str) -> List[Dict[str, Any]]:
-        return await self.rag_pipeline.fetch_file_regions(session_id, doc_id)
-
     @staticmethod
     def format_context(context_list: List[dict]) -> str:
         """Format a list of chunks into a string for the LLM."""
