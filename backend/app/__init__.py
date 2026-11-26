@@ -31,7 +31,7 @@ from fastapi import FastAPI
 from app.core.config import config
 from app.core.init_db import ensure_local_db
 from app.services.scholar_research.scholar_exec_service import ScholarExecutionService
-from app.services.citations_service.execution_service import CitationsExecutionService
+from app.services.execution_service import CitationsExecutionService
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.rag_service.rag_execution_service import RAGExecutionService
