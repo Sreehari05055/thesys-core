@@ -32,10 +32,11 @@ transformers>=4.40.0
 torch>=2.0.0
 psutil>=5.9.0
 
-# --- Tokenization / PDF / text cleanup ---
-docling>=2.0.0
+# --- PDF parse / text cleanup ---
+# docling-core 2.106+ accepts the document schema docling-rs writes.
+docling-rs>=2.85.0
+docling-core>=2.106
+docling-parse>=7.17.0
 pymupdf>=1.24.0
 ftfy>=6.2.0
 clean-text>=0.6.0
-rapidocr>=3.0.0
-onnxruntime>=1.18.0
