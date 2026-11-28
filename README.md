@@ -58,7 +58,7 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000). First build is large; first
 
 - **Frontend:** React (Vite) on port `5000`
 - **Backend:** FastAPI on port `8000`
-- **RAG:** Docling ingest → Chroma + BGE embeddings → BGE reranker
+- **RAG:** [docling-rs](https://github.com/docling-project/docling.rs) ingest → Chroma + BGE embeddings → BGE reranker
 - **OCR:** off by default (`DO_OCR=false`); set `DO_OCR=true` for scanned PDFs
 - **Chat:** OpenAI via LangChain
 - **Compare:** TypeSafe Jev (`TYPESAFE_API_KEY`)
